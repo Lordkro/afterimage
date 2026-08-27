@@ -7,7 +7,8 @@ from typing import Any, Protocol
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
-from afterimage.settings import Settings
+from afterimage.keys import KeyStore
+from afterimage.settings import Settings, paid_mode
 
 
 class Facilitator(Protocol):
@@ -73,6 +74,45 @@ def settlement_headers(result: dict) -> dict[str, str]:
     return {"PAYMENT-RESPONSE": b64json_encode(result)}
 
 
+def _bearer_secret(request: Request) -> str | None:
+    auth = request.headers.get("authorization") or ""
+    if auth.lower().startswith("bearer "):
+        return auth[7:].strip()
+    api_key = request.headers.get("x-api-key")
+    return api_key.strip() if api_key else None
+
+
+def unpaid_response(
+    *,
+    settings: Settings,
+    resource_path: str,
+    amount: str,
+    description: str,
+    error: str,
+) -> JSONResponse:
+    public = settings.public_url.rstrip("/")
+    body: dict = {
+        "error": error,
+        "checkout": f"POST {public}/v1/billing/checkout",
+        "authorization": "Authorization: Bearer ak_live_…",
+    }
+    if settings.pay_to.strip():
+        required = payment_required(
+            settings=settings,
+            resource_url=f"{public}{resource_path}",
+            amount=amount,
+            description=description,
+            error=error,
+        )
+        body.update(required)
+        return JSONResponse(
+            status_code=402,
+            content=body,
+            headers={"PAYMENT-REQUIRED": b64json_encode(required)},
+        )
+    return JSONResponse(status_code=402, content=body)
+
+
 async def require_payment(
     request: Request,
     *,
@@ -81,35 +121,54 @@ async def require_payment(
     amount: str,
     resource_path: str,
     description: str = "Reusable web snapshot with provenance",
+    keys: KeyStore | None = None,
 ) -> JSONResponse | dict | None:
     """Return a 402 response, or settlement result dict if paid. None if unpaid mode."""
-    if not settings.pay_to.strip():
+    if not paid_mode(settings):
         return None
-    public = settings.public_url.rstrip("/")
-    required = payment_required(
-        settings=settings,
-        resource_url=f"{public}{resource_path}",
-        amount=amount,
-        description=description,
-    )
+    secret = _bearer_secret(request)
+    if keys is not None and secret:
+        ok = await keys.debit(secret, int(amount))
+        if ok:
+            return {"success": True, "rail": "stripe"}
+        return unpaid_response(
+            settings=settings,
+            resource_path=resource_path,
+            amount=amount,
+            description=description,
+            error="API key missing credits. POST /v1/billing/checkout to top up.",
+        )
     signature = request.headers.get("payment-signature") or request.headers.get(
         "x-payment"
     )
-    if not signature:
-        return challenge_response(required)
-    if facilitator is None:
-        required["error"] = "facilitator is not configured"
-        return challenge_response(required)
-    try:
-        payload = b64json_decode(signature)
-    except ValueError:
-        required["error"] = "PAYMENT-SIGNATURE is not valid JSON"
-        return challenge_response(required)
-    result = await facilitator.settle(payload, required)
-    if not result.get("success"):
-        required["error"] = result.get("errorReason") or "payment settlement failed"
-        return challenge_response(required)
-    return result
+    if signature and settings.pay_to.strip():
+        public = settings.public_url.rstrip("/")
+        required = payment_required(
+            settings=settings,
+            resource_url=f"{public}{resource_path}",
+            amount=amount,
+            description=description,
+        )
+        if facilitator is None:
+            required["error"] = "facilitator is not configured"
+            return challenge_response(required)
+        try:
+            payload = b64json_decode(signature)
+        except ValueError:
+            required["error"] = "PAYMENT-SIGNATURE is not valid JSON"
+            return challenge_response(required)
+        result = await facilitator.settle(payload, required)
+        if not result.get("success"):
+            required["error"] = result.get("errorReason") or "payment settlement failed"
+            return challenge_response(required)
+        return result
+    return unpaid_response(
+        settings=settings,
+        resource_path=resource_path,
+        amount=amount,
+        description=description,
+        error="Payment required. Buy credits via Stripe checkout or pay with x402.",
+    )
 
 
 

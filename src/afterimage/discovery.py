@@ -9,20 +9,28 @@ from afterimage.pricing import (
     SEARCH_ATOMIC,
     SEARCH_USDC,
 )
-from afterimage.settings import Settings, paid_mode
+from afterimage.settings import Settings
 
 
 def llms_txt(settings: Settings) -> str:
     base = settings.public_url.rstrip("/")
-    pay = (
-        (
+    if settings.stripe_secret_key.strip():
+        pay = (
+            f"Paid. Buy credits: POST {base}/v1/billing/checkout {{\"pack\":\"starter\"}}. "
+            f"Then Authorization: Bearer ak_live_…. "
+            f"Cache hit = ${HIT_USDC}. Live fetch = ${MISS_USDC}. Search = ${SEARCH_USDC}."
+        )
+    elif settings.pay_to.strip():
+        pay = (
             f"Paid via x402 v2. Cache hit = ${HIT_USDC} USDC. Live fetch = ${MISS_USDC} USDC. "
             f"Corpus search = ${SEARCH_USDC} USDC. "
             "No API key. On 402, retry with PAYMENT-SIGNATURE (USDC on Base)."
         )
-        if paid_mode(settings)
-        else "This instance is in free/dev mode (AFTERIMAGE_PAY_TO unset). Production charges USDC via x402."
-    )
+    else:
+        pay = (
+            "This instance is in free/dev mode. Production charges Stripe credit packs "
+            "or x402 USDC."
+        )
     return f"""# AfterImage
 > Shared web snapshots for AI agents. Fetch once, reuse with provenance.
 

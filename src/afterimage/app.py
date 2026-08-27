@@ -1,15 +1,18 @@
 from __future__ import annotations
 
 from fastapi import FastAPI, Query, Request
-from fastapi.responses import JSONResponse, PlainTextResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, Response
 
 from afterimage import __version__
+from afterimage.checkout import Checkout, StripeCheckout
 from afterimage.clock import SystemClock
 from afterimage.discovery import agent_card, llms_txt, x402_well_known
 from afterimage.facilitator import HttpFacilitator
 from afterimage.fetch import HttpxFetcher
+from afterimage.keys import KeyStore, SqliteKeyStore
 from afterimage.mcp import handle_rpc
 from afterimage.models import Clock, Fetcher, SnapshotStore
+from afterimage.packs import PACKS, get_pack
 from afterimage.pages import DEFAULT_MAX_AGE_S, PageResponse, fresh_snapshot, snapshot_page
 from afterimage.pricing import SEARCH_ATOMIC, price_atomic
 from afterimage.search import (
@@ -30,6 +33,8 @@ def create_app(
     clock: Clock | None = None,
     settings: Settings | None = None,
     facilitator: Facilitator | None = None,
+    keys: KeyStore | None = None,
+    checkout: Checkout | None = None,
 ) -> FastAPI:
     settings = settings or Settings()
     if fetcher is None:
@@ -38,6 +43,13 @@ def create_app(
         store = SqliteSnapshotStore(settings.sqlite_path)
     if facilitator is None and settings.facilitator_url:
         facilitator = HttpFacilitator(settings.facilitator_url)
+    if keys is None and settings.stripe_secret_key:
+        keys = SqliteKeyStore(settings.sqlite_path)
+    if checkout is None and settings.stripe_secret_key:
+        checkout = StripeCheckout(
+            secret_key=settings.stripe_secret_key,
+            public_url=settings.public_url,
+        )
     app = FastAPI(
         title="AfterImage",
         version=__version__,
@@ -48,6 +60,8 @@ def create_app(
     app.state.clock = clock or SystemClock()
     app.state.settings = settings
     app.state.facilitator = facilitator
+    app.state.keys = keys
+    app.state.checkout = checkout
 
     @app.get("/health")
     def health() -> dict[str, str]:
@@ -97,6 +111,7 @@ def create_app(
             facilitator=app.state.facilitator,
             amount=price_atomic(cache_hit=cached is not None),
             resource_path="/v1/page",
+            keys=app.state.keys,
         )
         if isinstance(payment, JSONResponse):
             return payment
@@ -111,7 +126,8 @@ def create_app(
         if payment is None:
             return page
         response = JSONResponse(page.model_dump())
-        response.headers.update(settlement_headers(payment))
+        if payment.get("rail") != "stripe":
+            response.headers.update(settlement_headers(payment))
         return response
 
     @app.get(
@@ -142,6 +158,7 @@ def create_app(
             amount=SEARCH_ATOMIC,
             resource_path="/v1/search",
             description="Search already-fetched web snapshots",
+            keys=app.state.keys,
         )
         if isinstance(payment, JSONResponse):
             return payment
@@ -156,7 +173,8 @@ def create_app(
         if payment is None:
             return result
         response = JSONResponse(result.model_dump())
-        response.headers.update(settlement_headers(payment))
+        if payment.get("rail") != "stripe":
+            response.headers.update(settlement_headers(payment))
         return response
 
     @app.post("/mcp", response_model=None)
@@ -173,6 +191,76 @@ def create_app(
         if reply is None:
             return Response(status_code=204)
         return reply
+
+    @app.post("/v1/billing/checkout")
+    async def billing_checkout(body: dict | None = None) -> JSONResponse:
+        if app.state.keys is None or app.state.checkout is None:
+            return JSONResponse(
+                status_code=503, content={"error": "Stripe billing is not configured"}
+            )
+        pack = get_pack((body or {}).get("pack") or "starter")
+        if pack is None:
+            return JSONResponse(
+                status_code=422,
+                content={"error": "unknown pack", "packs": list(PACKS)},
+            )
+        key_id, secret = await app.state.keys.issue()
+        checkout_url = await app.state.checkout.create_session(
+            key_id=key_id, pack=pack.id, cents=pack.cents
+        )
+        return JSONResponse(
+            {
+                "api_key": secret,
+                "key_id": key_id,
+                "checkout_url": checkout_url,
+                "pack": pack.id,
+                "credits_usd": pack.micros / 1_000_000,
+            }
+        )
+
+    @app.get("/v1/billing/balance")
+    async def billing_balance(request: Request) -> JSONResponse:
+        if app.state.keys is None:
+            return JSONResponse(status_code=503, content={"error": "billing off"})
+        from afterimage.x402 import _bearer_secret
+
+        secret = _bearer_secret(request)
+        if not secret:
+            return JSONResponse(status_code=401, content={"error": "missing API key"})
+        micros = await app.state.keys.balance(secret)
+        if micros is None:
+            return JSONResponse(status_code=401, content={"error": "unknown API key"})
+        return JSONResponse({"credits_usd": micros / 1_000_000, "micros": micros})
+
+    @app.post("/v1/billing/webhook")
+    async def billing_webhook(request: Request) -> JSONResponse:
+        if not app.state.settings.stripe_webhook_secret:
+            return JSONResponse(status_code=503, content={"error": "webhook not configured"})
+        import stripe
+
+        payload = await request.body()
+        sig = request.headers.get("stripe-signature", "")
+        try:
+            event = stripe.Webhook.construct_event(
+                payload, sig, app.state.settings.stripe_webhook_secret
+            )
+        except Exception:
+            return JSONResponse(status_code=400, content={"error": "invalid signature"})
+        if event["type"] == "checkout.session.completed":
+            session = event["data"]["object"]
+            metadata = session.get("metadata") or {}
+            pack = get_pack(str(metadata.get("pack") or ""))
+            key_id = str(metadata.get("key_id") or "")
+            if pack and key_id and app.state.keys is not None:
+                await app.state.keys.credit(key_id, pack.micros, str(session.get("id")))
+        return JSONResponse({"ok": True})
+
+    @app.get("/v1/billing/success", response_class=HTMLResponse, include_in_schema=False)
+    def billing_success() -> str:
+        return (
+            "<html><body><p>Payment received. Credits will appear on your API key "
+            "within a few seconds. Check GET /v1/billing/balance.</p></body></html>"
+        )
 
     return app
 

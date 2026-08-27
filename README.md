@@ -28,7 +28,7 @@ Internet agents spend most of their paid calls looking at the same URLs. AfterIm
 | `GET /.well-known/agent-card.json` | A2A agent card |
 | `POST /mcp` | MCP JSON-RPC (`search_pages`, `get_page`) |
 
-No API key. In paid mode the page endpoint answers `402` with a `PAYMENT-REQUIRED` header (x402 v2, USDC on Base). In dev, leave `AFTERIMAGE_PAY_TO` empty and calls are free.
+Humans buy credits with Stripe (`POST /v1/billing/checkout`). Agents send `Authorization: Bearer ak_live_…`. Per-call card charges are not used — Stripe's fees would eat a $0.002 hit. x402 USDC remains optional if `AFTERIMAGE_PAY_TO` is set.
 
 ## Run
 

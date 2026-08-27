@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     network: str = "eip155:8453"
     usdc_asset: str = BASE_USDC
     facilitator_url: str = ""
+    stripe_secret_key: str = ""
+    stripe_webhook_secret: str = ""
     sqlite_path: str = "data/afterimage.db"
     # Cache, not an archive. These caps keep the Railway volume small.
     max_snapshots: int = 5_000
@@ -25,4 +27,4 @@ class Settings(BaseSettings):
 
 
 def paid_mode(settings: Settings) -> bool:
-    return bool(settings.pay_to.strip())
+    return bool(settings.pay_to.strip() or settings.stripe_secret_key.strip())
