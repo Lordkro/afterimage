@@ -2,14 +2,14 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from already.app import create_app
-from already.store import SqliteSnapshotStore
+from afterimage.app import create_app
+from afterimage.store import SqliteSnapshotStore
 from tests.fakes import FakeClock, FakeFetcher, FakePage
 from tests.test_page import PRICING_HTML
 
 
 def test_snapshots_persist_across_app_instances(tmp_path: Path) -> None:
-    path = str(tmp_path / "already.db")
+    path = str(tmp_path / "afterimage.db")
     clock = FakeClock()
     url = "https://example.com/pricing"
 
@@ -38,7 +38,7 @@ def test_snapshots_persist_across_app_instances(tmp_path: Path) -> None:
 
 
 def test_search_survives_across_app_instances(tmp_path: Path) -> None:
-    path = str(tmp_path / "already.db")
+    path = str(tmp_path / "afterimage.db")
     url = "https://example.com/pricing"
     clock = FakeClock()
 

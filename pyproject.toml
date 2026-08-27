@@ -3,13 +3,13 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "already"
+name = "afterimage"
 version = "0.1.0"
 description = "Shared web snapshots for AI agents — fetch once, reuse with provenance."
 readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "MIT" }
-authors = [{ name = "Already" }]
+authors = [{ name = "AfterImage" }]
 dependencies = [
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.32.0",
@@ -26,10 +26,10 @@ dev = [
 ]
 
 [project.scripts]
-already = "already.cli:main"
+afterimage = "afterimage.cli:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/already"]
+packages = ["src/afterimage"]
 
 [tool.hatch.build.targets.wheel.sources]
 "src" = ""

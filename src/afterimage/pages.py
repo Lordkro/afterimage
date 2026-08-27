@@ -4,11 +4,11 @@ from datetime import UTC, datetime
 
 from pydantic import BaseModel, Field
 
-from already.extract import extract_readable
-from already.hashing import sha256_bytes
-from already.models import Clock, Fetcher, Snapshot, SnapshotStore
-from already.pricing import price_usdc
-from already.urls import require_public_http_url
+from afterimage.extract import extract_readable
+from afterimage.hashing import sha256_bytes
+from afterimage.models import Clock, Fetcher, Snapshot, SnapshotStore
+from afterimage.pricing import price_usdc
+from afterimage.urls import require_public_http_url
 
 DEFAULT_MAX_AGE_S = 900
 

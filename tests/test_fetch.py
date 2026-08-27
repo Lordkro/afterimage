@@ -1,7 +1,7 @@
 import pytest
 from fastapi import HTTPException
 
-from already.fetch import HttpxFetcher
+from afterimage.fetch import HttpxFetcher
 
 
 def _loopback_resolver(host: str, port: object, *args: object, **kwargs: object) -> list:

@@ -1,7 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from already.app import create_app
+from afterimage.app import create_app
 from tests.fakes import FakeFetcher, MemorySnapshotStore
 
 BLOCKED = [

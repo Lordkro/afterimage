@@ -5,10 +5,10 @@ COPY pyproject.toml README.md ./
 COPY src ./src
 RUN pip install --no-cache-dir .
 
-ENV ALREADY_HOST=0.0.0.0
-ENV ALREADY_PORT=8080
-ENV ALREADY_SQLITE_PATH=/data/already.db
+ENV AFTERIMAGE_HOST=0.0.0.0
+ENV AFTERIMAGE_PORT=8080
+ENV AFTERIMAGE_SQLITE_PATH=/data/afterimage.db
 VOLUME ["/data"]
 EXPOSE 8080
 
-CMD ["already"]
+CMD ["afterimage"]

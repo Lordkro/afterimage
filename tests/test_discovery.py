@@ -1,9 +1,9 @@
 from fastapi.testclient import TestClient
 
-from already.app import create_app
+from afterimage.app import create_app
 
 
-def test_llms_txt_tells_an_agent_how_to_call_already() -> None:
+def test_llms_txt_tells_an_agent_how_to_call_afterimage() -> None:
     client = TestClient(create_app())
 
     response = client.get("/llms.txt")
@@ -11,7 +11,7 @@ def test_llms_txt_tells_an_agent_how_to_call_already() -> None:
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/plain")
     text = response.text
-    assert "Already" in text
+    assert "AfterImage" in text
     assert "/v1/page" in text
     assert "max_age_s" in text
     assert "x402" in text.lower()
@@ -59,7 +59,7 @@ def test_agent_card_is_a2a_discoverable() -> None:
 
     assert response.status_code == 200
     card = response.json()
-    assert card["name"] == "Already"
+    assert card["name"] == "AfterImage"
     assert "skills" in card
     skill_ids = {s["id"] for s in card["skills"]}
     assert "get_page" in skill_ids

@@ -3,9 +3,9 @@ import json
 
 from fastapi.testclient import TestClient
 
-from already.app import create_app
-from already.pricing import HIT_ATOMIC, MISS_ATOMIC, SEARCH_ATOMIC
-from already.settings import Settings
+from afterimage.app import create_app
+from afterimage.pricing import HIT_ATOMIC, MISS_ATOMIC, SEARCH_ATOMIC
+from afterimage.settings import Settings
 from tests.fakes import FakeClock, FakeFetcher, FakePage, MemorySnapshotStore
 from tests.test_page import PRICING_HTML
 
@@ -31,7 +31,7 @@ def _paid_client(**kwargs) -> TestClient:
             ),
             store=kwargs.get("store", MemorySnapshotStore()),
             clock=kwargs.get("clock", FakeClock()),
-            settings=Settings(pay_to=PAY_TO, public_url="https://already.example"),
+            settings=Settings(pay_to=PAY_TO, public_url="https://afterimage.example"),
             facilitator=kwargs.get("facilitator", AcceptingFacilitator()),
         )
     )
@@ -71,7 +71,7 @@ def test_paid_mode_challenges_cache_hit_at_hit_price() -> None:
             fetcher=fetcher,
             store=store,
             clock=clock,
-            settings=Settings(pay_to=PAY_TO, public_url="https://already.example"),
+            settings=Settings(pay_to=PAY_TO, public_url="https://afterimage.example"),
             facilitator=AcceptingFacilitator(),
         )
     )
@@ -117,7 +117,7 @@ def test_paid_mode_challenges_search_at_search_price() -> None:
             fetcher=fetcher,
             store=store,
             clock=clock,
-            settings=Settings(pay_to=PAY_TO, public_url="https://already.example"),
+            settings=Settings(pay_to=PAY_TO, public_url="https://afterimage.example"),
             facilitator=AcceptingFacilitator(),
         )
     )

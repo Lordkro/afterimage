@@ -6,9 +6,9 @@ from datetime import datetime
 from fastapi import HTTPException
 from pydantic import BaseModel, Field
 
-from already.models import Clock, Snapshot, SnapshotStore
-from already.pages import iso_z
-from already.pricing import SEARCH_USDC
+from afterimage.models import Clock, Snapshot, SnapshotStore
+from afterimage.pages import iso_z
+from afterimage.pricing import SEARCH_USDC
 
 DEFAULT_SEARCH_LIMIT = 10
 MAX_SEARCH_LIMIT = 50

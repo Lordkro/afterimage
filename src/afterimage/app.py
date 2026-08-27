@@ -3,24 +3,24 @@ from __future__ import annotations
 from fastapi import FastAPI, Query, Request
 from fastapi.responses import JSONResponse, PlainTextResponse, Response
 
-from already import __version__
-from already.clock import SystemClock
-from already.discovery import agent_card, llms_txt, x402_well_known
-from already.facilitator import HttpFacilitator
-from already.fetch import HttpxFetcher
-from already.mcp import handle_rpc
-from already.models import Clock, Fetcher, SnapshotStore
-from already.pages import DEFAULT_MAX_AGE_S, PageResponse, fresh_snapshot, snapshot_page
-from already.pricing import SEARCH_ATOMIC, price_atomic
-from already.search import (
+from afterimage import __version__
+from afterimage.clock import SystemClock
+from afterimage.discovery import agent_card, llms_txt, x402_well_known
+from afterimage.facilitator import HttpFacilitator
+from afterimage.fetch import HttpxFetcher
+from afterimage.mcp import handle_rpc
+from afterimage.models import Clock, Fetcher, SnapshotStore
+from afterimage.pages import DEFAULT_MAX_AGE_S, PageResponse, fresh_snapshot, snapshot_page
+from afterimage.pricing import SEARCH_ATOMIC, price_atomic
+from afterimage.search import (
     DEFAULT_SEARCH_LIMIT,
     MAX_SEARCH_LIMIT,
     SearchResponse,
     search_corpus,
 )
-from already.settings import Settings
-from already.store import SqliteSnapshotStore
-from already.x402 import Facilitator, require_payment, settlement_headers
+from afterimage.settings import Settings
+from afterimage.store import SqliteSnapshotStore
+from afterimage.x402 import Facilitator, require_payment, settlement_headers
 
 
 def create_app(
@@ -39,7 +39,7 @@ def create_app(
     if facilitator is None and settings.facilitator_url:
         facilitator = HttpFacilitator(settings.facilitator_url)
     app = FastAPI(
-        title="Already",
+        title="AfterImage",
         version=__version__,
         description="Shared web snapshots for AI agents.",
     )
@@ -51,7 +51,7 @@ def create_app(
 
     @app.get("/health")
     def health() -> dict[str, str]:
-        return {"status": "ok", "service": "already"}
+        return {"status": "ok", "service": "afterimage"}
 
     @app.get("/llms.txt", response_class=PlainTextResponse, include_in_schema=False)
     def get_llms_txt() -> str:
@@ -84,7 +84,7 @@ def create_app(
         ),
     ) -> PageResponse | JSONResponse:
         if app.state.fetcher is None or app.state.store is None:
-            raise RuntimeError("Already is not configured with a fetcher and store")
+            raise RuntimeError("AfterImage is not configured with a fetcher and store")
         cached = await fresh_snapshot(
             url,
             max_age_s=max_age_s,
@@ -133,7 +133,7 @@ def create_app(
         ),
     ) -> SearchResponse | JSONResponse:
         if app.state.store is None:
-            raise RuntimeError("Already is not configured with a store")
+            raise RuntimeError("AfterImage is not configured with a store")
         payment = await require_payment(
             request,
             settings=app.state.settings,
@@ -160,7 +160,7 @@ def create_app(
     @app.post("/mcp", response_model=None)
     async def mcp_endpoint(message: dict) -> dict | Response:
         if app.state.fetcher is None or app.state.store is None:
-            raise RuntimeError("Already is not configured with a fetcher and store")
+            raise RuntimeError("AfterImage is not configured with a fetcher and store")
         reply = await handle_rpc(
             message,
             store=app.state.store,

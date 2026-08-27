@@ -7,7 +7,7 @@ from typing import Any, Protocol
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
-from already.settings import Settings
+from afterimage.settings import Settings
 
 
 class Facilitator(Protocol):
@@ -44,7 +44,7 @@ def payment_required(
             "url": resource_url,
             "description": description,
             "mimeType": "application/json",
-            "serviceName": "Already",
+            "serviceName": "AfterImage",
         },
         "accepts": [
             {

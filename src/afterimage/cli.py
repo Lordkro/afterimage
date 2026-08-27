@@ -1,4 +1,4 @@
-from already.settings import Settings
+from afterimage.settings import Settings
 
 
 def main() -> None:
@@ -6,7 +6,7 @@ def main() -> None:
 
     settings = Settings()
     uvicorn.run(
-        "already.app:app",
+        "afterimage.app:app",
         host=settings.host,
         port=settings.port,
         factory=False,

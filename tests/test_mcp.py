@@ -2,7 +2,7 @@ import json
 
 from fastapi.testclient import TestClient
 
-from already.app import create_app
+from afterimage.app import create_app
 from tests.fakes import FakeFetcher, FakePage, MemorySnapshotStore
 from tests.test_page import PRICING_HTML
 
@@ -18,7 +18,7 @@ def _client() -> TestClient:
     )
 
 
-def test_mcp_initialize_identifies_already() -> None:
+def test_mcp_initialize_identifies_afterimage() -> None:
     client = _client()
 
     response = client.post(
@@ -37,7 +37,7 @@ def test_mcp_initialize_identifies_already() -> None:
 
     assert response.status_code == 200
     result = response.json()["result"]
-    assert result["serverInfo"]["name"] == "already"
+    assert result["serverInfo"]["name"] == "afterimage"
     assert "tools" in result["capabilities"]
 
 

@@ -5,7 +5,7 @@ import sqlite3
 from datetime import UTC, datetime
 from pathlib import Path
 
-from already.models import Snapshot
+from afterimage.models import Snapshot
 
 
 class SqliteSnapshotStore:

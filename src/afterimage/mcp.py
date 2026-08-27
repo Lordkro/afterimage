@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from already import __version__
-from already.models import Clock, Fetcher, SnapshotStore
-from already.pages import DEFAULT_MAX_AGE_S, snapshot_page
-from already.search import DEFAULT_SEARCH_LIMIT, MAX_SEARCH_LIMIT, search_corpus
+from afterimage import __version__
+from afterimage.models import Clock, Fetcher, SnapshotStore
+from afterimage.pages import DEFAULT_MAX_AGE_S, snapshot_page
+from afterimage.search import DEFAULT_SEARCH_LIMIT, MAX_SEARCH_LIMIT, search_corpus
 
 SEARCH_PAGES_SCHEMA = {
     "type": "object",
@@ -60,7 +60,7 @@ def tools() -> list[dict[str, Any]]:
         {
             "name": "search_pages",
             "description": (
-                "Search pages Already has already fetched. Returns urls, titles, snippets, "
+                "Search pages AfterImage has already fetched. Returns urls, titles, snippets, "
                 "hashes, and fetched_at. Use this instead of scraping when another agent "
                 "may have looked already. Then call get_page for the full snapshot."
             ),
@@ -73,7 +73,7 @@ def initialize_result() -> dict[str, Any]:
     return {
         "protocolVersion": "2024-11-05",
         "capabilities": {"tools": {"listChanged": False}},
-        "serverInfo": {"name": "already", "version": __version__},
+        "serverInfo": {"name": "afterimage", "version": __version__},
         "instructions": (
             "Call search_pages to query the corpus of already-fetched pages. "
             "Call get_page with a public http(s) url when you need a specific page's "

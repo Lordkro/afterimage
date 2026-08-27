@@ -8,13 +8,13 @@ from urllib.parse import urljoin, urlparse
 import httpx
 from fastapi import HTTPException
 
-from already.models import FetchResult
-from already.urls import require_public_http_url
+from afterimage.models import FetchResult
+from afterimage.urls import require_public_http_url
 
 MAX_BYTES = 5_000_000
 MAX_REDIRECTS = 5
 TIMEOUT_S = 15.0
-USER_AGENT = "Already/0.1 (+https://already.dev; agent-snapshot)"
+USER_AGENT = "AfterImage/0.1 (+https://github.com/Lordkro/afterimage; agent-snapshot)"
 
 Resolver = Callable[..., list]
 

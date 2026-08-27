@@ -1,4 +1,4 @@
-# Already
+# AfterImage
 
 Shared web snapshots for AI agents. Fetch a page once, reuse it with provenance instead of scraping it again.
 
@@ -7,13 +7,13 @@ GET /v1/search?q=fastapi+background+tasks
 GET /v1/page?url=https://example.com/pricing&max_age_s=900
 ```
 
-Search only ranks pages Already has already fetched — it never hits the live web.  
+Search only ranks pages AfterImage has already fetched — it never hits the live web.  
 Miss (live fetch): priced as a fetch.  
 Hit (fresh enough): priced as a reuse. Same bytes, same hash, `cache: "hit"`.
 
 ## Why
 
-Internet agents spend most of their paid calls looking at the same URLs. Already is a CDN for those eyes: a snapshot with `fetched_at`, a content hash, and readable text an agent can trust without re-fetching.
+Internet agents spend most of their paid calls looking at the same URLs. AfterImage is the afterimage of those looks: a snapshot with `fetched_at`, a content hash, and readable text an agent can trust without re-fetching.
 
 ## Agent entrypoints
 
@@ -28,7 +28,7 @@ Internet agents spend most of their paid calls looking at the same URLs. Already
 | `GET /.well-known/agent-card.json` | A2A agent card |
 | `POST /mcp` | MCP JSON-RPC (`search_pages`, `get_page`) |
 
-No API key. In paid mode the page endpoint answers `402` with a `PAYMENT-REQUIRED` header (x402 v2, USDC on Base). In dev, leave `ALREADY_PAY_TO` empty and calls are free.
+No API key. In paid mode the page endpoint answers `402` with a `PAYMENT-REQUIRED` header (x402 v2, USDC on Base). In dev, leave `AFTERIMAGE_PAY_TO` empty and calls are free.
 
 ## Run
 
@@ -37,8 +37,8 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -e '.[dev]'
 cp .env.example .env
-already
-# or: uvicorn already.app:app --reload
+afterimage
+# or: uvicorn afterimage.app:app --reload
 ```
 
 ```bash
@@ -90,4 +90,4 @@ If `indexed` is 0, nobody has fetched yet — call `/v1/page` first. Title match
 
 ## Safety
 
-Already refuses to fetch loopback, link-local, and private addresses. Redirects are re-checked. This is a public fetch API; SSRF is part of the product, not a later patch.
+AfterImage refuses to fetch loopback, link-local, and private addresses. Redirects are re-checked. This is a public fetch API; SSRF is part of the product, not a later patch.

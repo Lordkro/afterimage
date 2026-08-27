@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from already import __version__
-from already.pricing import (
+from afterimage import __version__
+from afterimage.pricing import (
     HIT_ATOMIC,
     HIT_USDC,
     MISS_ATOMIC,
@@ -9,7 +9,7 @@ from already.pricing import (
     SEARCH_ATOMIC,
     SEARCH_USDC,
 )
-from already.settings import Settings, paid_mode
+from afterimage.settings import Settings, paid_mode
 
 
 def llms_txt(settings: Settings) -> str:
@@ -21,9 +21,9 @@ def llms_txt(settings: Settings) -> str:
             "No API key. On 402, retry with PAYMENT-SIGNATURE (USDC on Base)."
         )
         if paid_mode(settings)
-        else "This instance is in free/dev mode (ALREADY_PAY_TO unset). Production charges USDC via x402."
+        else "This instance is in free/dev mode (AFTERIMAGE_PAY_TO unset). Production charges USDC via x402."
     )
-    return f"""# Already
+    return f"""# AfterImage
 > Shared web snapshots for AI agents. Fetch once, reuse with provenance.
 
 {base} is an HTTP API. Prefer structured endpoints over scraping this file.
@@ -36,7 +36,7 @@ corpus has no hit.
 ## Search the corpus
 GET {base}/v1/search?q={{query}}&limit=10&max_age_s=86400
 
-Search never hits the live web. It only ranks pages Already has already fetched.
+Search never hits the live web. It only ranks pages AfterImage has already fetched.
 Response JSON:
 - q, indexed (how many snapshots are stored), hits[]
 - each hit: url, title, snippet, hash, fetched_at, age_s, status, score
@@ -96,7 +96,7 @@ def x402_well_known(settings: Settings) -> dict:
 
     return {
         "x402Version": 2,
-        "serviceName": "Already",
+        "serviceName": "AfterImage",
         "description": "Reusable web snapshots with provenance for AI agents.",
         "resources": [
             {
@@ -124,7 +124,7 @@ def x402_well_known(settings: Settings) -> dict:
 def agent_card(settings: Settings) -> dict:
     base = settings.public_url.rstrip("/")
     return {
-        "name": "Already",
+        "name": "AfterImage",
         "description": "Shared web snapshots for AI agents. Fetch once, reuse with provenance.",
         "url": base,
         "version": __version__,
@@ -150,7 +150,7 @@ def agent_card(settings: Settings) -> dict:
                 "id": "search_pages",
                 "name": "Search fetched pages",
                 "description": (
-                    "Search the corpus of pages Already has already fetched. "
+                    "Search the corpus of pages AfterImage has already fetched. "
                     "Returns snippets, hashes, and fetched_at. Does not scrape the live web."
                 ),
                 "tags": ["search", "cache", "provenance", "x402"],

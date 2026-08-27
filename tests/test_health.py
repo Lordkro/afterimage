@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from already.app import create_app
+from afterimage.app import create_app
 
 
 def test_health_reports_ready() -> None:
@@ -11,4 +11,4 @@ def test_health_reports_ready() -> None:
     assert response.status_code == 200
     body = response.json()
     assert body["status"] == "ok"
-    assert body["service"] == "already"
+    assert body["service"] == "afterimage"

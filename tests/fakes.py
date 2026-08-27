@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
-from already.models import FetchResult, Snapshot
+from afterimage.models import FetchResult, Snapshot
 
 
 @dataclass
