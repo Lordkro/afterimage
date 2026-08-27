@@ -11,10 +11,14 @@ from tests.test_page import PRICING_HTML
 class FakeCheckout:
     def __init__(self) -> None:
         self.sessions: list[dict] = []
+        self.paid: dict[str, dict] = {}
 
     async def create_session(self, *, key_id: str, pack: str, cents: int) -> str:
         self.sessions.append({"key_id": key_id, "pack": pack, "cents": cents})
         return f"https://checkout.test/{pack}/{key_id}"
+
+    async def retrieve_session(self, session_id: str) -> dict:
+        return self.paid[session_id]
 
 
 def _stripe_client(keys: MemoryKeyStore | None = None, checkout: FakeCheckout | None = None):
@@ -84,3 +88,25 @@ def test_empty_balance_is_rejected() -> None:
     )
     assert response.status_code == 402
     assert keys.balance_for_secret(created["api_key"]) == 0
+
+
+def test_success_url_credits_a_paid_stripe_session() -> None:
+    client, keys, checkout = _stripe_client()
+    created = client.post("/v1/billing/checkout", json={"pack": "starter"}).json()
+    session_id = "cs_test_paid_1"
+    checkout.paid[session_id] = {
+        "id": session_id,
+        "payment_status": "paid",
+        "metadata": {"key_id": created["key_id"], "pack": "starter"},
+    }
+
+    response = client.get("/v1/billing/success", params={"session_id": session_id})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["credited"] is True
+    assert keys.balance_for_secret(created["api_key"]) == 5_000_000
+
+    again = client.get("/v1/billing/success", params={"session_id": session_id}).json()
+    assert again["already"] is True
+    assert keys.balance_for_secret(created["api_key"]) == 5_000_000

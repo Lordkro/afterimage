@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from fastapi import FastAPI, Query, Request
-from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, Response
+from fastapi.responses import JSONResponse, PlainTextResponse, Response
 
 from afterimage import __version__
-from afterimage.checkout import Checkout, StripeCheckout
+from afterimage.checkout import Checkout, StripeCheckout, _get, apply_paid_session
 from afterimage.clock import SystemClock
 from afterimage.discovery import agent_card, llms_txt, x402_well_known
 from afterimage.facilitator import HttpFacilitator
@@ -232,6 +232,17 @@ def create_app(
             return JSONResponse(status_code=401, content={"error": "unknown API key"})
         return JSONResponse({"credits_usd": micros / 1_000_000, "micros": micros})
 
+    async def _fulfill(session_id: str) -> JSONResponse:
+        if app.state.keys is None or app.state.checkout is None:
+            return JSONResponse(status_code=503, content={"error": "billing off"})
+        try:
+            session = await app.state.checkout.retrieve_session(session_id)
+        except Exception:
+            return JSONResponse(status_code=404, content={"error": "unknown session"})
+        result = await apply_paid_session(app.state.keys, session)
+        status = 200 if result.get("credited") else 402
+        return JSONResponse(result, status_code=status)
+
     @app.post("/v1/billing/webhook")
     async def billing_webhook(request: Request) -> JSONResponse:
         if not app.state.settings.stripe_webhook_secret:
@@ -246,21 +257,19 @@ def create_app(
             )
         except Exception:
             return JSONResponse(status_code=400, content={"error": "invalid signature"})
-        if event["type"] == "checkout.session.completed":
-            session = event["data"]["object"]
-            metadata = session.get("metadata") or {}
-            pack = get_pack(str(metadata.get("pack") or ""))
-            key_id = str(metadata.get("key_id") or "")
-            if pack and key_id and app.state.keys is not None:
-                await app.state.keys.credit(key_id, pack.micros, str(session.get("id")))
+        event_type = _get(event, "type")
+        if event_type == "checkout.session.completed":
+            data = _get(_get(event, "data"), "object")
+            session_id = str(_get(data, "id") or "")
+            if session_id:
+                return await _fulfill(session_id)
         return JSONResponse({"ok": True})
 
-    @app.get("/v1/billing/success", response_class=HTMLResponse, include_in_schema=False)
-    def billing_success() -> str:
-        return (
-            "<html><body><p>Payment received. Credits will appear on your API key "
-            "within a few seconds. Check GET /v1/billing/balance.</p></body></html>"
-        )
+    @app.get("/v1/billing/success", include_in_schema=False)
+    async def billing_success(session_id: str | None = None) -> JSONResponse:
+        if not session_id:
+            return JSONResponse({"error": "session_id required"}, status_code=422)
+        return await _fulfill(session_id)
 
     return app
 
