@@ -7,8 +7,9 @@ from fastapi import HTTPException
 from pydantic import BaseModel, Field
 
 from afterimage.models import Clock, Snapshot, SnapshotStore
-from afterimage.pages import iso_z
+from afterimage.pages import iso_z, prune_corpus
 from afterimage.pricing import SEARCH_USDC
+from afterimage.settings import Settings
 
 DEFAULT_SEARCH_LIMIT = 10
 MAX_SEARCH_LIMIT = 50
@@ -86,7 +87,9 @@ async def search_corpus(
     clock: Clock,
     limit: int = DEFAULT_SEARCH_LIMIT,
     max_age_s: int | None = None,
+    settings: Settings | None = None,
 ) -> SearchResponse:
+    settings = settings or Settings()
     q = q.strip()
     tokens = tokenize(q)
     if not tokens:
@@ -94,6 +97,7 @@ async def search_corpus(
     if limit < 1:
         limit = DEFAULT_SEARCH_LIMIT
     limit = min(limit, MAX_SEARCH_LIMIT)
+    await prune_corpus(store, settings, clock)
     now = clock.now()
     indexed = await store.count()
     candidates = await store.search(tokens, limit=MAX_SEARCH_LIMIT)

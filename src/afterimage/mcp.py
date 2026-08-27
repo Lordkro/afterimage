@@ -6,6 +6,7 @@ from afterimage import __version__
 from afterimage.models import Clock, Fetcher, SnapshotStore
 from afterimage.pages import DEFAULT_MAX_AGE_S, snapshot_page
 from afterimage.search import DEFAULT_SEARCH_LIMIT, MAX_SEARCH_LIMIT, search_corpus
+from afterimage.settings import Settings
 
 SEARCH_PAGES_SCHEMA = {
     "type": "object",
@@ -88,6 +89,7 @@ async def handle_rpc(
     store: SnapshotStore,
     fetcher: Fetcher,
     clock: Clock,
+    settings: Settings | None = None,
 ) -> dict[str, Any] | None:
     if message.get("jsonrpc") != "2.0":
         return {
@@ -109,7 +111,12 @@ async def handle_rpc(
         return {"jsonrpc": "2.0", "id": rpc_id, "result": {"tools": tools()}}
     if method == "tools/call":
         return await _call_tool(
-            rpc_id, params, store=store, fetcher=fetcher, clock=clock
+            rpc_id,
+            params,
+            store=store,
+            fetcher=fetcher,
+            clock=clock,
+            settings=settings or Settings(),
         )
     return {
         "jsonrpc": "2.0",
@@ -125,14 +132,23 @@ async def _call_tool(
     store: SnapshotStore,
     fetcher: Fetcher,
     clock: Clock,
+    settings: Settings,
 ) -> dict[str, Any]:
     name = params.get("name")
     arguments = params.get("arguments") or {}
     try:
         if name == "get_page":
-            payload = await _get_page(arguments, store=store, fetcher=fetcher, clock=clock)
+            payload = await _get_page(
+                arguments,
+                store=store,
+                fetcher=fetcher,
+                clock=clock,
+                settings=settings,
+            )
         elif name == "search_pages":
-            payload = await _search_pages(arguments, store=store, clock=clock)
+            payload = await _search_pages(
+                arguments, store=store, clock=clock, settings=settings
+            )
         else:
             return {
                 "jsonrpc": "2.0",
@@ -166,6 +182,7 @@ async def _get_page(
     store: SnapshotStore,
     fetcher: Fetcher,
     clock: Clock,
+    settings: Settings,
 ) -> dict[str, Any]:
     url = arguments.get("url")
     if not url:
@@ -177,6 +194,7 @@ async def _get_page(
         store=store,
         fetcher=fetcher,
         clock=clock,
+        settings=settings,
     )
     return page.model_dump()
 
@@ -186,6 +204,7 @@ async def _search_pages(
     *,
     store: SnapshotStore,
     clock: Clock,
+    settings: Settings,
 ) -> dict[str, Any]:
     q = arguments.get("q")
     if not q:
@@ -198,6 +217,7 @@ async def _search_pages(
         clock=clock,
         limit=limit,
         max_age_s=int(max_age_s) if max_age_s is not None else None,
+        settings=settings,
     )
     return result.model_dump()
 

@@ -54,6 +54,21 @@ class MemorySnapshotStore:
                 break
         return hits
 
+    async def prune(self, *, now: datetime, ttl_s: int, max_snapshots: int) -> None:
+        if ttl_s > 0:
+            expired = [
+                url
+                for url, snapshot in self._by_url.items()
+                if (now - snapshot.fetched_at).total_seconds() > ttl_s
+            ]
+            for url in expired:
+                del self._by_url[url]
+        if max_snapshots <= 0:
+            return
+        while len(self._by_url) > max_snapshots:
+            oldest = min(self._by_url.values(), key=lambda item: item.fetched_at)
+            del self._by_url[oldest.url]
+
 
 class FakeClock:
     def __init__(self, now: str = "2026-08-27T18:41:02Z") -> None:

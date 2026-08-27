@@ -106,6 +106,7 @@ def create_app(
             store=app.state.store,
             fetcher=app.state.fetcher,
             clock=app.state.clock,
+            settings=app.state.settings,
         )
         if payment is None:
             return page
@@ -150,6 +151,7 @@ def create_app(
             clock=app.state.clock,
             limit=limit,
             max_age_s=max_age_s,
+            settings=app.state.settings,
         )
         if payment is None:
             return result
@@ -166,6 +168,7 @@ def create_app(
             store=app.state.store,
             fetcher=app.state.fetcher,
             clock=app.state.clock,
+            settings=app.state.settings,
         )
         if reply is None:
             return Response(status_code=204)

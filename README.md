@@ -91,3 +91,16 @@ If `indexed` is 0, nobody has fetched yet — call `/v1/page` first. Title match
 ## Safety
 
 AfterImage refuses to fetch loopback, link-local, and private addresses. Redirects are re-checked. This is a public fetch API; SSRF is part of the product, not a later patch.
+
+## Storage caps
+
+This is a cache, not an archive. Defaults keep a Railway volume small:
+
+| Cap | Default | Env |
+|---|---|---|
+| Snapshots kept | 5,000 | `AFTERIMAGE_MAX_SNAPSHOTS` |
+| Text per page | 32,000 chars | `AFTERIMAGE_MAX_TEXT_CHARS` |
+| Snapshot TTL | 7 days | `AFTERIMAGE_SNAPSHOT_TTL_S` |
+| Error pages | not stored | `AFTERIMAGE_PERSIST_ERROR_PAGES` |
+
+Raw HTML is never stored — only the readable extract. When the corpus is full, the oldest snapshots are dropped.

@@ -17,6 +17,11 @@ class Settings(BaseSettings):
     usdc_asset: str = BASE_USDC
     facilitator_url: str = ""
     sqlite_path: str = "data/afterimage.db"
+    # Cache, not an archive. These caps keep the Railway volume small.
+    max_snapshots: int = 5_000
+    max_text_chars: int = 32_000
+    snapshot_ttl_s: int = 7 * 24 * 60 * 60
+    persist_error_pages: bool = False
 
 
 def paid_mode(settings: Settings) -> bool:

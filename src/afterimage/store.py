@@ -122,6 +122,37 @@ class SqliteSnapshotStore:
             ).fetchall()
         return [self._row_to_snapshot(row) for row in rows]
 
+    async def prune(self, *, now: datetime, ttl_s: int, max_snapshots: int) -> None:
+        async with self._lock:
+            if ttl_s > 0:
+                cutoff = now.astimezone(UTC).isoformat()
+                urls = [
+                    row[0]
+                    for row in self._conn.execute(
+                        "SELECT url FROM snapshots WHERE fetched_at < ?",
+                        (cutoff,),
+                    ).fetchall()
+                ]
+                self._delete_urls(urls)
+            if max_snapshots > 0:
+                count_row = self._conn.execute("SELECT COUNT(*) FROM snapshots").fetchone()
+                extra = int(count_row[0]) - max_snapshots if count_row else 0
+                if extra > 0:
+                    oldest = [
+                        row[0]
+                        for row in self._conn.execute(
+                            "SELECT url FROM snapshots ORDER BY fetched_at ASC LIMIT ?",
+                            (extra,),
+                        ).fetchall()
+                    ]
+                    self._delete_urls(oldest)
+            self._conn.commit()
+
+    def _delete_urls(self, urls: list[str]) -> None:
+        for url in urls:
+            self._conn.execute("DELETE FROM snapshots WHERE url = ?", (url,))
+            self._conn.execute("DELETE FROM snapshots_fts WHERE url = ?", (url,))
+
     def _row_to_snapshot(self, row: tuple) -> Snapshot:
         fetched_at = datetime.fromisoformat(row[6])
         if fetched_at.tzinfo is None:
