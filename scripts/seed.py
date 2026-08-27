@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import os
 import sys
 from pathlib import Path
 
@@ -29,17 +30,26 @@ def load_urls(path: Path) -> list[str]:
     return urls
 
 
+def _headers(api_key: str | None) -> dict[str, str]:
+    if not api_key:
+        return {}
+    return {"Authorization": f"Bearer {api_key}"}
+
+
 async def snapshot(
     client: httpx.AsyncClient,
     host: str,
     url: str,
     sem: asyncio.Semaphore,
+    api_key: str | None,
+    max_age_s: int,
 ) -> tuple[str, str, int | None]:
     async with sem:
         try:
             response = await client.get(
                 f"{host.rstrip('/')}/v1/page",
-                params={"url": url, "max_age_s": 604800},
+                params={"url": url, "max_age_s": max_age_s},
+                headers=_headers(api_key),
             )
         except httpx.HTTPError as exc:
             return url, f"error:{type(exc).__name__}", None
@@ -54,6 +64,16 @@ async def main() -> int:
     parser.add_argument("--host", default=DEFAULT_HOST)
     parser.add_argument("--urls", type=Path, default=DEFAULT_URLS)
     parser.add_argument("--concurrency", type=int, default=3)
+    parser.add_argument(
+        "--api-key",
+        default=os.environ.get("AFTERIMAGE_API_KEY"),
+        help="Bearer key (or AFTERIMAGE_API_KEY). Required when billing is on.",
+    )
+    parser.add_argument(
+        "--refresh",
+        action="store_true",
+        help="Force live fetches (max_age_s=0) to rewrite stored extracts.",
+    )
     args = parser.parse_args()
     urls = load_urls(args.urls)
     if not urls:
@@ -65,7 +85,11 @@ async def main() -> int:
     ok = 0
     stored = 0
     async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
-        tasks = [snapshot(client, args.host, url, sem) for url in urls]
+        max_age_s = 0 if args.refresh else 604800
+        tasks = [
+            snapshot(client, args.host, url, sem, args.api_key, max_age_s)
+            for url in urls
+        ]
         for coro in asyncio.as_completed(tasks):
             url, cache, status = await coro
             kept = cache in {"hit", "miss"} and status is not None and status < 400
@@ -74,7 +98,12 @@ async def main() -> int:
                 stored += 1
             mark = "ok" if kept else "skip"
             print(f"{mark:4} {cache:12} {status!s:>4} {url}", flush=True)
-    search = httpx.get(f"{args.host.rstrip('/')}/v1/search", params={"q": "python"}, timeout=30.0)
+    search = httpx.get(
+        f"{args.host.rstrip('/')}/v1/search",
+        params={"q": "python"},
+        headers=_headers(args.api_key),
+        timeout=30.0,
+    )
     indexed = search.json().get("indexed") if search.status_code == 200 else "?"
     print(f"done stored_ok={stored}/{len(urls)} indexed={indexed}")
     return 0 if stored else 2

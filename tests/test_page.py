@@ -43,6 +43,7 @@ def test_page_fetch_returns_readable_snapshot_on_miss() -> None:
     assert body["status"] == 200
     assert body["title"] == "Pricing"
     assert "Pro is $9 per month." in body["text"]
+    assert "Home" not in body["text"]
     assert "<html>" not in body["text"]
     assert "alert(" not in body["text"]
     assert body["hash"].startswith("sha256:")

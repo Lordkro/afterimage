@@ -90,6 +90,60 @@ def test_empty_balance_is_rejected() -> None:
     assert keys.balance_for_secret(created["api_key"]) == 0
 
 
+def test_mcp_initialize_stays_free_in_stripe_mode() -> None:
+    client, _keys, _checkout = _stripe_client()
+    response = client.post(
+        "/mcp",
+        json={
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+                "protocolVersion": "2024-11-05",
+                "capabilities": {},
+                "clientInfo": {"name": "test", "version": "0"},
+            },
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["result"]["serverInfo"]["name"] == "afterimage"
+
+
+def test_mcp_tools_require_credits() -> None:
+    client, keys, _checkout = _stripe_client()
+    unpaid = client.post(
+        "/mcp",
+        json={
+            "jsonrpc": "2.0",
+            "id": 3,
+            "method": "tools/call",
+            "params": {
+                "name": "search_pages",
+                "arguments": {"q": "pricing"},
+            },
+        },
+    )
+    assert unpaid.status_code == 402
+
+    created = client.post("/v1/billing/checkout", json={"pack": "starter"}).json()
+    keys.apply_credit(created["key_id"], micros=5_000_000, stripe_session="cs_mcp")
+    paid = client.post(
+        "/mcp",
+        headers={"Authorization": f"Bearer {created['api_key']}"},
+        json={
+            "jsonrpc": "2.0",
+            "id": 4,
+            "method": "tools/call",
+            "params": {
+                "name": "get_page",
+                "arguments": {"url": "https://example.com/pricing"},
+            },
+        },
+    )
+    assert paid.status_code == 200
+    assert paid.json()["result"]["isError"] is False
+
+
 def test_success_url_credits_a_paid_stripe_session() -> None:
     client, keys, checkout = _stripe_client()
     created = client.post("/v1/billing/checkout", json={"pack": "starter"}).json()

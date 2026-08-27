@@ -30,6 +30,8 @@ Internet agents spend most of their paid calls looking at the same URLs. AfterIm
 
 Humans buy credits with Stripe (`POST /v1/billing/checkout`). Agents send `Authorization: Bearer ak_live_…`. Per-call card charges are not used — Stripe's fees would eat a $0.002 hit. x402 USDC remains optional if `AFTERIMAGE_PAY_TO` is set.
 
+Stripe webhook (live): `https://afterimage-production.up.railway.app/v1/billing/webhook` with `checkout.session.completed`. If a payment does not credit, `GET /v1/billing/success?session_id=cs_live_…` applies it once.
+
 ## Run
 
 ```bash
@@ -87,6 +89,14 @@ pytest
 ```
 
 If `indexed` is 0, nobody has fetched yet — call `/v1/page` first. Title matches rank above body-only matches.
+
+## Weekly seed
+
+`scripts/seed.py` refreshes the corpus (7-day TTL). Production billing requires `AFTERIMAGE_API_KEY`. GitHub Actions runs it Mondays; add repo secret `AFTERIMAGE_API_KEY` (a funded `ak_live_` key). Manual:
+
+```bash
+AFTERIMAGE_API_KEY=ak_live_… python scripts/seed.py
+```
 
 ## Safety
 

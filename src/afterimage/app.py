@@ -178,9 +178,42 @@ def create_app(
         return response
 
     @app.post("/mcp", response_model=None)
-    async def mcp_endpoint(message: dict) -> dict | Response:
+    async def mcp_endpoint(request: Request, message: dict) -> dict | Response:
         if app.state.fetcher is None or app.state.store is None:
             raise RuntimeError("AfterImage is not configured with a fetcher and store")
+        if message.get("method") == "tools/call":
+            params = message.get("params") or {}
+            name = params.get("name")
+            arguments = params.get("arguments") or {}
+            amount = None
+            if name == "search_pages":
+                amount = SEARCH_ATOMIC
+            elif name == "get_page":
+                page_url = arguments.get("url")
+                if page_url:
+                    try:
+                        cached = await fresh_snapshot(
+                            page_url,
+                            max_age_s=int(
+                                arguments.get("max_age_s", DEFAULT_MAX_AGE_S)
+                            ),
+                            store=app.state.store,
+                            clock=app.state.clock,
+                        )
+                        amount = price_atomic(cache_hit=cached is not None)
+                    except Exception:
+                        amount = None
+            if amount is not None:
+                payment = await require_payment(
+                    request,
+                    settings=app.state.settings,
+                    facilitator=app.state.facilitator,
+                    amount=amount,
+                    resource_path="/mcp",
+                    keys=app.state.keys,
+                )
+                if isinstance(payment, JSONResponse):
+                    return payment
         reply = await handle_rpc(
             message,
             store=app.state.store,
