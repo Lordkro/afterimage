@@ -64,3 +64,21 @@ def test_search_survives_across_app_instances(tmp_path: Path) -> None:
     assert body["indexed"] == 1
     assert body["hits"][0]["url"] == url
     assert "$9" in body["hits"][0]["snippet"]
+
+
+def test_sqlite_does_not_drop_fresh_snapshots_on_the_next_second(tmp_path: Path) -> None:
+    path = str(tmp_path / "afterimage.db")
+    clock = FakeClock()
+    url = "https://example.com/pricing"
+    client = TestClient(
+        create_app(
+            fetcher=FakeFetcher({url: FakePage(body=PRICING_HTML)}),
+            store=SqliteSnapshotStore(path),
+            clock=clock,
+        )
+    )
+    assert client.get("/v1/page", params={"url": url}).json()["cache"] == "miss"
+    clock.advance(1)
+    body = client.get("/v1/search", params={"q": "Pro is $9"}).json()
+    assert body["indexed"] == 1
+    assert body["hits"][0]["url"] == url

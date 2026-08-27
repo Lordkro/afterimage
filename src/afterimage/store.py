@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import sqlite3
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from afterimage.models import Snapshot
@@ -125,7 +125,7 @@ class SqliteSnapshotStore:
     async def prune(self, *, now: datetime, ttl_s: int, max_snapshots: int) -> None:
         async with self._lock:
             if ttl_s > 0:
-                cutoff = now.astimezone(UTC).isoformat()
+                cutoff = (now.astimezone(UTC) - timedelta(seconds=ttl_s)).isoformat()
                 urls = [
                     row[0]
                     for row in self._conn.execute(
