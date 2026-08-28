@@ -109,7 +109,10 @@ def create_app(
         return llms_txt(app.state.settings)
 
     def _public_json(
-        content: dict, *, media_type: str = "application/json"
+        content: dict,
+        *,
+        media_type: str = "application/json",
+        cache: str = "public, max-age=3600",
     ) -> JSONResponse:
         return JSONResponse(
             content,
@@ -118,13 +121,16 @@ def create_app(
                 "Access-Control-Allow-Origin": "*",
                 "Access-Control-Allow-Methods": "GET",
                 "Access-Control-Allow-Headers": "Content-Type, If-None-Match",
-                "Cache-Control": "public, max-age=3600",
+                "Cache-Control": cache,
             },
         )
 
     @app.get("/.well-known/x402", include_in_schema=False)
     def get_x402() -> JSONResponse:
-        return _public_json(x402_well_known(app.state.settings))
+        return _public_json(
+            x402_well_known(app.state.settings),
+            cache="no-store",
+        )
 
     @app.get("/.well-known/agent-card.json", include_in_schema=False)
     def get_agent_card() -> JSONResponse:

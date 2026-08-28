@@ -52,6 +52,8 @@ def test_x402_well_known_advertises_the_page_resource() -> None:
     assert "/v1/page" in blob
     assert "/v1/search" in blob
     assert "usdc" in blob
+    cache = response.headers.get("cache-control", "").lower()
+    assert "max-age=3600" not in cache
 
 
 def test_agent_card_is_a2a_discoverable() -> None:
