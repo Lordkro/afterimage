@@ -4,13 +4,13 @@
 
 If another agent already fetched a page, yours can reuse that copy (timestamp + sha256 hash) instead of scraping again. Search the copies. Humans buy credits on Stripe; agents send an API key.
 
-Live: [https://afterimage-production.up.railway.app](https://afterimage-production.up.railway.app)  
-Agent brief: [https://afterimage-production.up.railway.app/llms.txt](https://afterimage-production.up.railway.app/llms.txt)
+Live: [https://afterimage.page](https://afterimage.page)  
+Agent brief: [https://afterimage.page/llms.txt](https://afterimage.page/llms.txt)
 
 ## Get a key
 
 ```bash
-curl -sS -X POST https://afterimage-production.up.railway.app/v1/billing/checkout \
+curl -sS -X POST https://afterimage.page/v1/billing/checkout \
   -H 'content-type: application/json' \
   -d '{"pack":"starter"}'
 ```
@@ -22,21 +22,21 @@ Open `checkout_url`, pay **$5** (`starter`) or **$20** (`builder`). Save `api_ke
 Search stored pages (does **not** hit the live web, **$0.005**):
 
 ```bash
-curl -sS 'https://afterimage-production.up.railway.app/v1/search?q=fastapi+background+tasks' \
+curl -sS 'https://afterimage.page/v1/search?q=fastapi+background+tasks' \
   -H "Authorization: Bearer ak_live_…"
 ```
 
 Fetch or reuse one URL (**$0.002** if a fresh copy exists, **$0.01** if AfterImage has to download it):
 
 ```bash
-curl -sS 'https://afterimage-production.up.railway.app/v1/page?url=https://example.com/&max_age_s=900' \
+curl -sS 'https://afterimage.page/v1/page?url=https://example.com/&max_age_s=900' \
   -H "Authorization: Bearer ak_live_…"
 ```
 
 Check remaining dollars:
 
 ```bash
-curl -sS https://afterimage-production.up.railway.app/v1/billing/balance \
+curl -sS https://afterimage.page/v1/billing/balance \
   -H "Authorization: Bearer ak_live_…"
 ```
 
@@ -70,7 +70,7 @@ afterimage
 pytest
 ```
 
-Set `AFTERIMAGE_STRIPE_SECRET_KEY` and `AFTERIMAGE_STRIPE_WEBHOOK_SECRET` to charge. Webhook URL: `https://YOUR_HOST/v1/billing/webhook`, event `checkout.session.completed`. If a payment does not land on the key, open `/v1/billing/success?session_id=cs_live_…`.
+Set `AFTERIMAGE_STRIPE_SECRET_KEY` and `AFTERIMAGE_STRIPE_WEBHOOK_SECRET` to charge. Webhook URL: `https://afterimage.page/v1/billing/webhook`, event `checkout.session.completed`. If a payment does not land on the key, open `/v1/billing/success?session_id=cs_live_…`.
 
 ## Limits
 

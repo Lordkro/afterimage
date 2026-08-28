@@ -17,4 +17,4 @@ jobs:
       - name: Refresh AfterImage corpus
         env:
           AFTERIMAGE_API_KEY: ${{ secrets.AFTERIMAGE_API_KEY }}
-        run: python scripts/seed.py --host https://afterimage-production.up.railway.app --concurrency 3 --refresh
+        run: python scripts/seed.py --host https://afterimage.page --concurrency 3 --refresh

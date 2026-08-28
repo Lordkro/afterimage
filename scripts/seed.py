@@ -13,7 +13,7 @@ import httpx
 
 ROOT = Path(__file__).resolve().parent
 DEFAULT_URLS = ROOT / "seed_urls.txt"
-DEFAULT_HOST = "https://afterimage-production.up.railway.app"
+DEFAULT_HOST = "https://afterimage.page"
 
 
 def load_urls(path: Path) -> list[str]:
