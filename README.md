@@ -55,9 +55,10 @@ HTTP **402** means missing key or empty credits — buy another pack.
 | `GET /health` | Is the service up? |
 | `GET /llms.txt` | Instructions for agents |
 | `GET /openapi.json` | Full API spec |
-| `POST /mcp` | Same search/fetch as JSON-RPC (`search_pages`, `get_page`). Needs the Bearer key on `tools/call`. |
+| `POST /mcp` | Same search/fetch as JSON-RPC (`search_pages`, `get_page`). Needs the Bearer key or x402 on `tools/call`. |
+| `GET /.well-known/mcp.json` | MCP server card (also `/mcp/server-card`) |
 | `GET /.well-known/agent-card.json` | Agent card |
-| `GET /.well-known/x402` | Optional crypto pay (USDC) if enabled |
+| `GET /.well-known/x402` | x402 USDC pay (live when `AFTERIMAGE_PAY_TO` is set) |
 
 ## Run a copy yourself
 

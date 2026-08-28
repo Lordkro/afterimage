@@ -8,6 +8,7 @@ __pycache__/
 dist/
 build/
 .env
+.mcp-registry-key.pem
 data/*.db
 data/*.db-journal
 *.db

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from urllib.parse import urlparse
+
 from afterimage import __version__
 from afterimage.pricing import (
     HIT_ATOMIC,
@@ -9,7 +11,54 @@ from afterimage.pricing import (
     SEARCH_ATOMIC,
     SEARCH_USDC,
 )
+from afterimage.x402 import bazaar_extension
 from afterimage.settings import Settings
+
+SERVER_CARD_SCHEMA = (
+    "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json"
+)
+MCP_REGISTRY_AUTH = (
+    "v=MCPv1; k=ed25519; p=v+vVQvrK4Bau5XH7W1VApvWdFgNY3w9v75GyIQ6AgDU="
+)
+DESCRIPTION = (
+    "Shared copies of public web pages for AI agents. "
+    "Search stored pages, or fetch a URL to add/reuse a copy with a timestamp and hash."
+)
+
+
+def reverse_dns_server_name(public_url: str, slug: str = "afterimage") -> str:
+    host = (urlparse(public_url).hostname or "localhost").lower()
+    if host in {"localhost", "127.0.0.1"}:
+        return f"local.host/{slug}"
+    return f"{'.'.join(reversed(host.split('.')))}/{slug}"
+
+
+def mcp_server_card(settings: Settings) -> dict:
+    base = settings.public_url.rstrip("/")
+    return {
+        "$schema": SERVER_CARD_SCHEMA,
+        "name": reverse_dns_server_name(base),
+        "title": "AfterImage",
+        "description": DESCRIPTION,
+        "version": __version__,
+        "websiteUrl": base,
+        "remotes": [{"type": "streamable-http", "url": f"{base}/mcp"}],
+    }
+
+
+def ai_catalog(settings: Settings) -> dict:
+    base = settings.public_url.rstrip("/")
+    host = urlparse(base).hostname or "localhost"
+    return {
+        "specVersion": "1.0",
+        "entries": [
+            {
+                "identifier": f"urn:air:{host}:mcp:afterimage",
+                "type": "application/mcp-server-card+json",
+                "url": f"{base}/mcp/server-card",
+            }
+        ],
+    }
 
 
 def llms_txt(settings: Settings) -> str:
@@ -85,7 +134,10 @@ If cache=hit, do not fetch the origin yourself unless you need a smaller max_age
 POST {base}/mcp
 JSON-RPC. Tools: search_pages, get_page.
 initialize and tools/list are free. tools/call for those two tools needs the same
-Authorization header as HTTP. HTTP 402 if unpaid.
+Authorization header as HTTP, or x402 USDC. HTTP 402 if unpaid.
+
+Server card: GET {base}/.well-known/mcp.json
+Also: GET {base}/mcp/server-card
 
 ## Other
 
@@ -99,7 +151,7 @@ Authorization header as HTTP. HTTP 402 if unpaid.
 def x402_well_known(settings: Settings) -> dict:
     base = settings.public_url.rstrip("/")
     resource_url = f"{base}/v1/page"
-    pay_to = settings.pay_to or "0x0000000000000000000000000000000000000000"
+    pay_to = settings.pay_to.strip()
     extra = {"name": "USDC", "version": "2"}
 
     def accept(amount: str) -> dict:
@@ -116,7 +168,10 @@ def x402_well_known(settings: Settings) -> dict:
     return {
         "x402Version": 2,
         "serviceName": "AfterImage",
-        "description": "Shared copies of public web pages for AI agents. Search first, then fetch.",
+        "description": (
+            "Shared copies of public web pages for AI agents. Search first, then fetch. "
+            "Pay with a Stripe API key or x402 USDC on Base."
+        ),
         "resources": [
             {
                 "url": resource_url,
@@ -124,7 +179,8 @@ def x402_well_known(settings: Settings) -> dict:
                     f"GET /v1/page. Reuse a stored copy (${HIT_USDC}) or fetch live (${MISS_USDC})."
                 ),
                 "mimeType": "application/json",
-                "accepts": [accept(HIT_ATOMIC), accept(MISS_ATOMIC)],
+                "accepts": [accept(HIT_ATOMIC), accept(MISS_ATOMIC)] if pay_to else [],
+                "extensions": bazaar_extension("/v1/page"),
             },
             {
                 "url": f"{base}/v1/search",
@@ -133,7 +189,17 @@ def x402_well_known(settings: Settings) -> dict:
                     "Does not visit the live web."
                 ),
                 "mimeType": "application/json",
-                "accepts": [accept(SEARCH_ATOMIC)],
+                "accepts": [accept(SEARCH_ATOMIC)] if pay_to else [],
+                "extensions": bazaar_extension("/v1/search"),
+            },
+            {
+                "url": f"{base}/mcp",
+                "description": "MCP tools search_pages and get_page over streamable HTTP.",
+                "mimeType": "application/json",
+                "accepts": [accept(SEARCH_ATOMIC), accept(HIT_ATOMIC), accept(MISS_ATOMIC)]
+                if pay_to
+                else [],
+                "extensions": bazaar_extension("/mcp", tool_name="get_page"),
             },
         ],
     }
@@ -143,10 +209,7 @@ def agent_card(settings: Settings) -> dict:
     base = settings.public_url.rstrip("/")
     return {
         "name": "AfterImage",
-        "description": (
-            "Shared copies of public web pages for AI agents. "
-            "Search stored pages, or fetch a URL to add/reuse a copy with a timestamp and hash."
-        ),
+        "description": DESCRIPTION,
         "url": base,
         "version": __version__,
         "protocolVersion": "0.3.0",

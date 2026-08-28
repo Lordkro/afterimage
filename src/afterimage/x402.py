@@ -8,6 +8,7 @@ from fastapi import Request
 from fastapi.responses import JSONResponse
 
 from afterimage.keys import KeyStore
+from afterimage.mcp import GET_PAGE_SCHEMA, SEARCH_PAGES_SCHEMA
 from afterimage.settings import Settings, paid_mode
 
 
@@ -30,6 +31,189 @@ def b64json_decode(token: str) -> dict:
     raise ValueError("invalid payment payload")
 
 
+def _http_get_bazaar(
+    *,
+    query_example: dict[str, str],
+    query_properties: dict[str, dict],
+    required_query: list[str],
+    output_example: dict[str, Any],
+) -> dict[str, Any]:
+    return {
+        "info": {
+            "input": {
+                "type": "http",
+                "method": "GET",
+                "queryParams": query_example,
+            },
+            "output": {"type": "json", "example": output_example},
+        },
+        "schema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object",
+            "properties": {
+                "input": {
+                    "type": "object",
+                    "properties": {
+                        "type": {"type": "string", "const": "http"},
+                        "method": {
+                            "type": "string",
+                            "enum": ["GET", "HEAD", "DELETE"],
+                        },
+                        "queryParams": {
+                            "type": "object",
+                            "properties": query_properties,
+                            "required": required_query,
+                        },
+                    },
+                    "required": ["type", "method"],
+                    "additionalProperties": False,
+                },
+                "output": {
+                    "type": "object",
+                    "properties": {
+                        "type": {"type": "string"},
+                        "example": {"type": "object"},
+                    },
+                },
+            },
+            "required": ["input"],
+        },
+    }
+
+
+def _mcp_bazaar(tool_name: str) -> dict[str, Any]:
+    if tool_name == "search_pages":
+        schema = SEARCH_PAGES_SCHEMA
+        example = {"q": "fastapi background tasks", "limit": 10}
+        description = "Search pages already stored in AfterImage. Does not visit the live web."
+        output = {
+            "q": "fastapi background tasks",
+            "indexed": 99,
+            "hits": [
+                {
+                    "url": "https://fastapi.tiangolo.com/",
+                    "title": "FastAPI",
+                    "snippet": "background tasks",
+                }
+            ],
+        }
+    else:
+        tool_name = "get_page"
+        schema = GET_PAGE_SCHEMA
+        example = {"url": "https://example.com/", "max_age_s": 900}
+        description = (
+            "Return readable text for a public http(s) URL. Reuses a stored copy "
+            "if it is newer than max_age_s."
+        )
+        output = {
+            "url": "https://example.com/",
+            "text": "Example Domain",
+            "hash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "cache": "hit",
+        }
+    return {
+        "info": {
+            "input": {
+                "type": "mcp",
+                "toolName": tool_name,
+                "description": description,
+                "transport": "streamable-http",
+                "inputSchema": schema,
+                "example": example,
+            },
+            "output": {"type": "json", "example": output},
+        },
+        "schema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object",
+            "properties": {
+                "input": {
+                    "type": "object",
+                    "properties": {
+                        "type": {"type": "string", "const": "mcp"},
+                        "toolName": {"type": "string"},
+                        "description": {"type": "string"},
+                        "transport": {"type": "string"},
+                        "inputSchema": {"type": "object"},
+                        "example": {"type": "object"},
+                    },
+                    "required": ["type", "toolName"],
+                },
+                "output": {
+                    "type": "object",
+                    "properties": {
+                        "type": {"type": "string"},
+                        "example": {"type": "object"},
+                    },
+                },
+            },
+            "required": ["input"],
+        },
+    }
+
+
+def bazaar_extension(
+    resource_path: str, *, tool_name: str | None = None
+) -> dict[str, Any]:
+    if tool_name or resource_path.startswith("/mcp"):
+        return {"bazaar": _mcp_bazaar(tool_name or "get_page")}
+    if resource_path.rstrip("/").endswith("/v1/search"):
+        return {
+            "bazaar": _http_get_bazaar(
+                query_example={"q": "fastapi background tasks", "limit": "10"},
+                query_properties={
+                    "q": {
+                        "type": "string",
+                        "description": "Words to find in stored titles and text",
+                    },
+                    "limit": {
+                        "type": "string",
+                        "description": "Max hits, 1-50",
+                    },
+                    "max_age_s": {
+                        "type": "string",
+                        "description": "Only copies this many seconds old",
+                    },
+                },
+                required_query=["q"],
+                output_example={
+                    "q": "fastapi background tasks",
+                    "indexed": 99,
+                    "hits": [
+                        {
+                            "url": "https://fastapi.tiangolo.com/",
+                            "title": "FastAPI",
+                            "snippet": "background tasks",
+                        }
+                    ],
+                },
+            )
+        }
+    return {
+        "bazaar": _http_get_bazaar(
+            query_example={"url": "https://example.com/", "max_age_s": "900"},
+            query_properties={
+                "url": {
+                    "type": "string",
+                    "description": "Public http(s) URL to snapshot",
+                },
+                "max_age_s": {
+                    "type": "string",
+                    "description": "Reuse a stored copy no older than this many seconds",
+                },
+            },
+            required_query=["url"],
+            output_example={
+                "url": "https://example.com/",
+                "text": "Example Domain",
+                "hash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                "cache": "hit",
+                "fetched_at": "2026-08-28T00:00:00Z",
+            },
+        )
+    }
+
+
 def payment_required(
     *,
     settings: Settings,
@@ -37,6 +221,8 @@ def payment_required(
     amount: str,
     description: str = "Reusable web snapshot with provenance",
     error: str = "PAYMENT-SIGNATURE header is required",
+    resource_path: str = "/v1/page",
+    tool_name: str | None = None,
 ) -> dict[str, Any]:
     return {
         "x402Version": 2,
@@ -46,6 +232,7 @@ def payment_required(
             "description": description,
             "mimeType": "application/json",
             "serviceName": "AfterImage",
+            "tags": ["web", "cache", "search", "snapshot"],
         },
         "accepts": [
             {
@@ -58,7 +245,7 @@ def payment_required(
                 "extra": {"name": "USDC", "version": "2"},
             }
         ],
-        "extensions": {},
+        "extensions": bazaar_extension(resource_path, tool_name=tool_name),
     }
 
 
@@ -89,6 +276,7 @@ def unpaid_response(
     amount: str,
     description: str,
     error: str,
+    tool_name: str | None = None,
 ) -> JSONResponse:
     public = settings.public_url.rstrip("/")
     body: dict = {
@@ -103,6 +291,8 @@ def unpaid_response(
             amount=amount,
             description=description,
             error=error,
+            resource_path=resource_path,
+            tool_name=tool_name,
         )
         body.update(required)
         return JSONResponse(
@@ -122,6 +312,7 @@ async def require_payment(
     resource_path: str,
     description: str = "Reusable web snapshot with provenance",
     keys: KeyStore | None = None,
+    tool_name: str | None = None,
 ) -> JSONResponse | dict | None:
     """Return a 402 response, or settlement result dict if paid. None if unpaid mode."""
     if not paid_mode(settings):
@@ -137,6 +328,7 @@ async def require_payment(
             amount=amount,
             description=description,
             error="API key missing credits. POST /v1/billing/checkout to top up.",
+            tool_name=tool_name,
         )
     signature = request.headers.get("payment-signature") or request.headers.get(
         "x-payment"
@@ -148,6 +340,8 @@ async def require_payment(
             resource_url=f"{public}{resource_path}",
             amount=amount,
             description=description,
+            resource_path=resource_path,
+            tool_name=tool_name,
         )
         if facilitator is None:
             required["error"] = "facilitator is not configured"
@@ -168,6 +362,7 @@ async def require_payment(
         amount=amount,
         description=description,
         error="Payment required. Buy credits via Stripe checkout or pay with x402.",
+        tool_name=tool_name,
     )
 
 

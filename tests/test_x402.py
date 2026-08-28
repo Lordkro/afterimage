@@ -55,6 +55,11 @@ def test_paid_mode_challenges_unpaid_fetch_at_miss_price() -> None:
     amounts = {item["amount"] for item in required["accepts"]}
     assert MISS_ATOMIC in amounts
     assert required["resource"]["url"].endswith("/v1/page")
+    bazaar = required["extensions"]["bazaar"]
+    assert bazaar["info"]["input"]["type"] == "http"
+    assert bazaar["info"]["input"]["method"] == "GET"
+    assert "url" in bazaar["info"]["input"]["queryParams"]
+    assert "url" in bazaar["schema"]["properties"]["input"]["properties"]["queryParams"]["properties"]
 
 
 def test_paid_mode_challenges_cache_hit_at_hit_price() -> None:
@@ -128,3 +133,4 @@ def test_paid_mode_challenges_search_at_search_price() -> None:
     amounts = {item["amount"] for item in required["accepts"]}
     assert amounts == {SEARCH_ATOMIC}
     assert required["resource"]["url"].endswith("/v1/search")
+    assert required["extensions"]["bazaar"]["info"]["input"]["queryParams"]["q"]

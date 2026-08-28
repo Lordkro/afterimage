@@ -6,7 +6,14 @@ from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, Res
 from afterimage import __version__
 from afterimage.checkout import Checkout, StripeCheckout, _get, apply_paid_session
 from afterimage.clock import SystemClock
-from afterimage.discovery import agent_card, llms_txt, x402_well_known
+from afterimage.discovery import (
+    MCP_REGISTRY_AUTH,
+    agent_card,
+    ai_catalog,
+    llms_txt,
+    mcp_server_card,
+    x402_well_known,
+)
 from afterimage.landing import landing_html
 from afterimage.facilitator import HttpFacilitator
 from afterimage.fetch import HttpxFetcher
@@ -76,13 +83,60 @@ def create_app(
     def get_llms_txt() -> str:
         return llms_txt(app.state.settings)
 
+    def _public_json(
+        content: dict, *, media_type: str = "application/json"
+    ) -> JSONResponse:
+        return JSONResponse(
+            content,
+            media_type=media_type,
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET",
+                "Access-Control-Allow-Headers": "Content-Type, If-None-Match",
+                "Cache-Control": "public, max-age=3600",
+            },
+        )
+
     @app.get("/.well-known/x402", include_in_schema=False)
-    def get_x402() -> dict:
-        return x402_well_known(app.state.settings)
+    def get_x402() -> JSONResponse:
+        return _public_json(x402_well_known(app.state.settings))
 
     @app.get("/.well-known/agent-card.json", include_in_schema=False)
-    def get_agent_card() -> dict:
-        return agent_card(app.state.settings)
+    def get_agent_card() -> JSONResponse:
+        return _public_json(agent_card(app.state.settings))
+
+    @app.get("/.well-known/mcp.json", include_in_schema=False)
+    def get_mcp_json() -> JSONResponse:
+        return _public_json(mcp_server_card(app.state.settings))
+
+    @app.get("/.well-known/mcp/server-card.json", include_in_schema=False)
+    def get_mcp_server_card_well_known() -> JSONResponse:
+        return _public_json(
+            mcp_server_card(app.state.settings),
+            media_type="application/mcp-server-card+json",
+        )
+
+    @app.get("/mcp/server-card", include_in_schema=False)
+    def get_mcp_server_card() -> JSONResponse:
+        return _public_json(
+            mcp_server_card(app.state.settings),
+            media_type="application/mcp-server-card+json",
+        )
+
+    @app.get("/.well-known/ai-catalog.json", include_in_schema=False)
+    def get_ai_catalog() -> JSONResponse:
+        return _public_json(
+            ai_catalog(app.state.settings),
+            media_type="application/ai-catalog+json",
+        )
+
+    @app.get(
+        "/.well-known/mcp-registry-auth",
+        response_class=PlainTextResponse,
+        include_in_schema=False,
+    )
+    def get_mcp_registry_auth() -> str:
+        return MCP_REGISTRY_AUTH
 
     @app.get(
         "/v1/page",
@@ -216,6 +270,7 @@ def create_app(
                     amount=amount,
                     resource_path="/mcp",
                     keys=app.state.keys,
+                    tool_name=name,
                 )
                 if isinstance(payment, JSONResponse):
                     return payment
