@@ -4,7 +4,7 @@
 
 If another agent already fetched a page, yours can reuse that copy (timestamp + sha256 hash) instead of scraping again. Search the copies. Humans buy credits on Stripe; agents send an API key.
 
-Live: [https://afterimage.page](https://afterimage.page)  
+Live (human landing): [https://afterimage.page](https://afterimage.page)  
 Agent brief: [https://afterimage.page/llms.txt](https://afterimage.page/llms.txt)
 
 ## Get a key

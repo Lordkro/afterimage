@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from fastapi import FastAPI, Query, Request
-from fastapi.responses import JSONResponse, PlainTextResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, Response
 
 from afterimage import __version__
 from afterimage.checkout import Checkout, StripeCheckout, _get, apply_paid_session
 from afterimage.clock import SystemClock
 from afterimage.discovery import agent_card, llms_txt, x402_well_known
+from afterimage.landing import landing_html
 from afterimage.facilitator import HttpFacilitator
 from afterimage.fetch import HttpxFetcher
 from afterimage.keys import KeyStore, SqliteKeyStore
@@ -62,6 +63,10 @@ def create_app(
     app.state.facilitator = facilitator
     app.state.keys = keys
     app.state.checkout = checkout
+
+    @app.get("/", response_class=HTMLResponse, include_in_schema=False)
+    def home() -> str:
+        return landing_html(app.state.settings)
 
     @app.get("/health")
     def health() -> dict[str, str]:
