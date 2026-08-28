@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from fastapi import FastAPI, Query, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, Response
 
 from afterimage import __version__
@@ -29,9 +30,9 @@ from afterimage.search import (
     SearchResponse,
     search_corpus,
 )
-from afterimage.settings import Settings
+from afterimage.settings import Settings, paid_mode
 from afterimage.store import SqliteSnapshotStore
-from afterimage.x402 import Facilitator, require_payment, settlement_headers
+from afterimage.x402 import Facilitator, require_payment, settlement_headers, unpaid_response
 
 
 def create_app(
@@ -70,6 +71,30 @@ def create_app(
     app.state.facilitator = facilitator
     app.state.keys = keys
     app.state.checkout = checkout
+
+    @app.exception_handler(RequestValidationError)
+    async def challenge_before_invalid_query(
+        request: Request, exc: RequestValidationError
+    ) -> JSONResponse:
+        path = request.url.path
+        if paid_mode(app.state.settings) and path in {"/v1/page", "/v1/search"}:
+            amount = (
+                SEARCH_ATOMIC
+                if path.endswith("/v1/search")
+                else price_atomic(cache_hit=False)
+            )
+            return unpaid_response(
+                settings=app.state.settings,
+                resource_path=path,
+                amount=amount,
+                description=(
+                    "Search already-fetched web snapshots"
+                    if path.endswith("/v1/search")
+                    else "Reusable web snapshot with provenance"
+                ),
+                error="Payment required. Buy credits via Stripe checkout or pay with x402.",
+            )
+        return JSONResponse(status_code=422, content={"detail": exc.errors()})
 
     @app.get("/", response_class=HTMLResponse, include_in_schema=False)
     def home() -> str:

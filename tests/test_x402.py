@@ -44,6 +44,16 @@ def _decode_payment_required(response) -> dict:
     return json.loads(base64.urlsafe_b64decode(padded))
 
 
+def test_paid_mode_challenges_even_when_query_params_are_missing() -> None:
+    client = _paid_client()
+
+    response = client.get("/v1/page")
+
+    assert response.status_code == 402
+    required = _decode_payment_required(response)
+    assert required["extensions"]["bazaar"]["info"]["input"]["method"] == "GET"
+
+
 def test_paid_mode_challenges_unpaid_fetch_at_miss_price() -> None:
     client = _paid_client()
 
