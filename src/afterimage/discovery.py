@@ -21,8 +21,7 @@ MCP_REGISTRY_AUTH = (
     "v=MCPv1; k=ed25519; p=v+vVQvrK4Bau5XH7W1VApvWdFgNY3w9v75GyIQ6AgDU="
 )
 DESCRIPTION = (
-    "Shared copies of public web pages for AI agents. "
-    "Search stored pages, or fetch a URL to add/reuse a copy with a timestamp and hash."
+    "Shared copies of public web pages for AI agents. Search stored pages or fetch a URL."
 )
 
 
