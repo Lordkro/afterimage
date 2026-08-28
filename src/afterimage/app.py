@@ -53,7 +53,7 @@ def create_app(
     app = FastAPI(
         title="AfterImage",
         version=__version__,
-        description="Shared web snapshots for AI agents.",
+        description="Shared copies of public web pages for AI agents. Search stored pages or fetch a URL.",
     )
     app.state.fetcher = fetcher
     app.state.store = store

@@ -1,38 +1,65 @@
 # AfterImage
 
-Shared web snapshots for AI agents. Fetch a page once, reuse it with provenance instead of scraping it again.
+**A shared copy of the public web for AI agents.**
 
-```http
-GET /v1/search?q=fastapi+background+tasks
-GET /v1/page?url=https://example.com/pricing&max_age_s=900
+If another agent already fetched a page, yours can reuse that copy (timestamp + sha256 hash) instead of scraping again. Search the copies. Humans buy credits on Stripe; agents send an API key.
+
+Live: [https://afterimage-production.up.railway.app](https://afterimage-production.up.railway.app)  
+Agent brief: [https://afterimage-production.up.railway.app/llms.txt](https://afterimage-production.up.railway.app/llms.txt)
+
+## Get a key
+
+```bash
+curl -sS -X POST https://afterimage-production.up.railway.app/v1/billing/checkout \
+  -H 'content-type: application/json' \
+  -d '{"pack":"starter"}'
 ```
 
-Search only ranks pages AfterImage has already fetched — it never hits the live web.  
-Miss (live fetch): priced as a fetch.  
-Hit (fresh enough): priced as a reuse. Same bytes, same hash, `cache: "hit"`.
+Open `checkout_url`, pay **$5** (`starter`) or **$20** (`builder`). Save `api_key`. Do not publish it.
 
-## Why
+## Call it
 
-Internet agents spend most of their paid calls looking at the same URLs. AfterImage is the afterimage of those looks: a snapshot with `fetched_at`, a content hash, and readable text an agent can trust without re-fetching.
+Search stored pages (does **not** hit the live web, **$0.005**):
 
-## Agent entrypoints
+```bash
+curl -sS 'https://afterimage-production.up.railway.app/v1/search?q=fastapi+background+tasks' \
+  -H "Authorization: Bearer ak_live_…"
+```
 
-| Path | What it is |
+Fetch or reuse one URL (**$0.002** if a fresh copy exists, **$0.01** if AfterImage has to download it):
+
+```bash
+curl -sS 'https://afterimage-production.up.railway.app/v1/page?url=https://example.com/&max_age_s=900' \
+  -H "Authorization: Bearer ak_live_…"
+```
+
+Check remaining dollars:
+
+```bash
+curl -sS https://afterimage-production.up.railway.app/v1/billing/balance \
+  -H "Authorization: Bearer ak_live_…"
+```
+
+HTTP **402** means missing key or empty credits — buy another pack.
+
+## What you get back
+
+**Search** — `indexed` (how many pages are stored), `hits[]` with `url`, `title`, `snippet`, `hash`, `fetched_at`. If `indexed` is 0, the library is empty; fetch some URLs first.
+
+**Page** — `text` (readable extract, not HTML), `cache` (`hit` or `miss`), `hash` (sha256 of the raw body), `fetched_at`.
+
+## Other endpoints
+
+| Path | What it does |
 |---|---|
-| `GET /v1/search` | Search the fetched corpus (no live fetch) |
-| `GET /v1/page` | Snapshot a URL |
-| `GET /health` | Liveness |
-| `GET /llms.txt` | Machine-readable product brief |
-| `GET /openapi.json` | OpenAPI 3 |
-| `GET /.well-known/x402` | x402 v2 discovery |
-| `GET /.well-known/agent-card.json` | A2A agent card |
-| `POST /mcp` | MCP JSON-RPC (`search_pages`, `get_page`) |
+| `GET /health` | Is the service up? |
+| `GET /llms.txt` | Instructions for agents |
+| `GET /openapi.json` | Full API spec |
+| `POST /mcp` | Same search/fetch as JSON-RPC (`search_pages`, `get_page`). Needs the Bearer key on `tools/call`. |
+| `GET /.well-known/agent-card.json` | Agent card |
+| `GET /.well-known/x402` | Optional crypto pay (USDC) if enabled |
 
-Humans buy credits with Stripe (`POST /v1/billing/checkout`). Agents send `Authorization: Bearer ak_live_…`. Per-call card charges are not used — Stripe's fees would eat a $0.002 hit. x402 USDC remains optional if `AFTERIMAGE_PAY_TO` is set.
-
-Stripe webhook (live): `https://afterimage-production.up.railway.app/v1/billing/webhook` with `checkout.session.completed`. If a payment does not credit, `GET /v1/billing/success?session_id=cs_live_…` applies it once.
-
-## Run
+## Run a copy yourself
 
 ```bash
 python3 -m venv .venv
@@ -40,77 +67,13 @@ source .venv/bin/activate
 pip install -e '.[dev]'
 cp .env.example .env
 afterimage
-# or: uvicorn afterimage.app:app --reload
-```
-
-```bash
 pytest
 ```
 
-## Snapshot shape
+Set `AFTERIMAGE_STRIPE_SECRET_KEY` and `AFTERIMAGE_STRIPE_WEBHOOK_SECRET` to charge. Webhook URL: `https://YOUR_HOST/v1/billing/webhook`, event `checkout.session.completed`. If a payment does not land on the key, open `/v1/billing/success?session_id=cs_live_…`.
 
-```json
-{
-  "url": "https://example.com/pricing",
-  "final_url": "https://example.com/pricing",
-  "status": 200,
-  "title": "Pricing",
-  "text": "…readable extract…",
-  "hash": "sha256:…",
-  "fetched_at": "2026-08-27T18:41:02Z",
-  "age_s": 0,
-  "cache": "miss",
-  "price_usdc": "0.01"
-}
-```
+## Limits
 
-`hash` is SHA-256 of the raw response body. `text` is a readable extract, not a raw HTML dump.
+This is a cache, not an archive. About **5,000** pages, **32,000** characters of text each, **7 days** old. Error pages are not stored. Private/internal URLs are rejected. Oldest pages are dropped when the cap is hit.
 
-## Search shape
-
-```json
-{
-  "q": "Pro is $9",
-  "indexed": 1,
-  "hits": [
-    {
-      "url": "https://example.com/pricing",
-      "title": "Pricing",
-      "snippet": "Pro is $9 per month.",
-      "hash": "sha256:…",
-      "fetched_at": "2026-08-27T18:41:02Z",
-      "age_s": 60,
-      "status": 200,
-      "score": 4.5
-    }
-  ],
-  "price_usdc": "0.005"
-}
-```
-
-If `indexed` is 0, nobody has fetched yet — call `/v1/page` first. Title matches rank above body-only matches.
-
-## Weekly seed
-
-`scripts/seed.py` refreshes the corpus (7-day TTL). Production billing requires `AFTERIMAGE_API_KEY`. GitHub Actions runs it Mondays; add repo secret `AFTERIMAGE_API_KEY` (a funded `ak_live_` key). Manual:
-
-```bash
-AFTERIMAGE_API_KEY=ak_live_… python scripts/seed.py
-```
-
-## Safety
-
-AfterImage refuses to fetch loopback, link-local, and private addresses. Redirects are re-checked. This is a public fetch API; SSRF is part of the product, not a later patch.
-
-## Storage caps
-
-This is a cache, not an archive. Defaults keep a Railway volume small:
-
-| Cap | Default | Env |
-|---|---|---|
-| Snapshots kept | 5,000 | `AFTERIMAGE_MAX_SNAPSHOTS` |
-| Text per page | 32,000 chars | `AFTERIMAGE_MAX_TEXT_CHARS` |
-| Snapshot TTL | 7 days | `AFTERIMAGE_SNAPSHOT_TTL_S` |
-| Error pages | not stored | `AFTERIMAGE_PERSIST_ERROR_PAGES` |
-
-Raw HTML is never stored — only the readable extract. When the corpus is full, the oldest snapshots are dropped.
+`scripts/seed.py` refills a useful default library. GitHub Actions can run it Mondays if the repo secret `AFTERIMAGE_API_KEY` is a funded key.

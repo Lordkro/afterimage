@@ -53,17 +53,17 @@ def tools() -> list[dict[str, Any]]:
         {
             "name": "get_page",
             "description": (
-                "Return a readable snapshot of a public web page, reusing a fresh-enough "
-                "cached copy when one exists. Includes sha256 hash, fetched_at, and cache hit/miss."
+                "Return readable text for a public http(s) URL. Reuses a stored copy if "
+                "it is newer than max_age_s. Includes sha256 hash and fetched_at. "
+                "Needs a funded API key on this HTTP request."
             ),
             "inputSchema": GET_PAGE_SCHEMA,
         },
         {
             "name": "search_pages",
             "description": (
-                "Search pages AfterImage has already fetched. Returns urls, titles, snippets, "
-                "hashes, and fetched_at. Use this instead of scraping when another agent "
-                "may have looked already. Then call get_page for the full snapshot."
+                "Search pages already stored in AfterImage. Does not visit the live web. "
+                "Then call get_page for the full text of a hit. Needs a funded API key."
             ),
             "inputSchema": SEARCH_PAGES_SCHEMA,
         },
@@ -76,9 +76,10 @@ def initialize_result() -> dict[str, Any]:
         "capabilities": {"tools": {"listChanged": False}},
         "serverInfo": {"name": "afterimage", "version": __version__},
         "instructions": (
-            "Call search_pages to query the corpus of already-fetched pages. "
-            "Call get_page with a public http(s) url when you need a specific page's "
-            "readable text and can accept a snapshot up to max_age_s seconds old."
+            "Send Authorization: Bearer <api_key> on this HTTP connection. "
+            "search_pages finds stored pages (no live scrape). "
+            "get_page returns full readable text for one public URL, reusing a copy "
+            "if it is newer than max_age_s."
         ),
     }
 

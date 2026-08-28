@@ -14,74 +14,85 @@ from afterimage.settings import Settings
 
 def llms_txt(settings: Settings) -> str:
     base = settings.public_url.rstrip("/")
-    if settings.stripe_secret_key.strip():
-        pay = (
-            f"Paid. Buy credits: POST {base}/v1/billing/checkout {{\"pack\":\"starter\"}}. "
-            f"Then Authorization: Bearer ak_live_…. "
-            f"Cache hit = ${HIT_USDC}. Live fetch = ${MISS_USDC}. Search = ${SEARCH_USDC}."
-        )
-    elif settings.pay_to.strip():
-        pay = (
-            f"Paid via x402 v2. Cache hit = ${HIT_USDC} USDC. Live fetch = ${MISS_USDC} USDC. "
-            f"Corpus search = ${SEARCH_USDC} USDC. "
-            "No API key. On 402, retry with PAYMENT-SIGNATURE (USDC on Base)."
-        )
-    else:
-        pay = (
-            "This instance is in free/dev mode. Production charges Stripe credit packs "
-            "or x402 USDC."
-        )
     return f"""# AfterImage
-> Shared web snapshots for AI agents. Fetch once, reuse with provenance.
 
-{base} is an HTTP API. Prefer structured endpoints over scraping this file.
+AfterImage is a shared copy of the public web for AI agents.
+If a page was fetched recently, reuse that copy instead of scraping again.
+Each copy has a timestamp and a sha256 hash of the raw bytes.
 
-## When to call
-Search the corpus first. If another agent already fetched the page, reuse that
-snapshot instead of scraping. Call get_page only when you know the URL or the
-corpus has no hit.
+Base URL: {base}
+Do not scrape this file. Call the JSON endpoints below.
 
-## Search the corpus
-GET {base}/v1/search?q={{query}}&limit=10&max_age_s=86400
+## 1. Get a key (human, once)
 
-Search never hits the live web. It only ranks pages AfterImage has already fetched.
-Response JSON:
-- q, indexed (how many snapshots are stored), hits[]
-- each hit: url, title, snippet, hash, fetched_at, age_s, status, score
-- price_usdc: "{SEARCH_USDC}"
-If indexed is 0, fetch with /v1/page then search again later.
+POST {base}/v1/billing/checkout
+Content-Type: application/json
 
-## Snapshot a URL
-GET {base}/v1/page?url={{absolute_http_url}}&max_age_s=900
+{{"pack":"starter"}}
+
+Packs: starter = $5 USD, builder = $20 USD.
+The JSON returns api_key and checkout_url.
+Open checkout_url, pay, then keep api_key secret.
+Send it on every later request:
+
+  Authorization: Bearer ak_live_…
+
+HTTP 402 means the header is missing or the key has no credits left. Buy another pack.
+GET {base}/v1/billing/balance with the same header to see remaining dollars.
+
+Prices:
+- GET /v1/search = ${SEARCH_USDC} per call
+- GET /v1/page cache hit = ${HIT_USDC} (copy still fresh)
+- GET /v1/page live fetch = ${MISS_USDC} (origin was contacted)
+
+Optional: x402 USDC on Base instead of a key, if this instance advertises it
+at GET {base}/.well-known/x402
+
+## 2. Search copies (does not visit the live web)
+
+GET {base}/v1/search?q=fastapi+background+tasks
 
 Query:
-- url (required): http or https URL. Loopback and private addresses are rejected.
-- max_age_s (optional, default 900): reuse a cached snapshot if it is no older than this.
+- q (required): words to find in titles and text
+- limit (optional, default 10, max 50)
+- max_age_s (optional): only copies this many seconds old
 
-Response JSON:
-- url, final_url, status, title, text
-- hash: sha256 of the raw response body (sha256:<hex>)
-- fetched_at: ISO-8601 UTC
-- age_s: seconds since fetch
-- cache: "hit" or "miss"
-- price_usdc: "{HIT_USDC}" on hit, "{MISS_USDC}" on miss
+Response:
+- indexed: how many copies are stored
+- hits[]: url, title, snippet, hash, fetched_at, age_s, status, score
+If indexed is 0, the library is empty. Fetch URLs with /v1/page, then search again.
+If hits is empty but indexed > 0, nothing matched. Try different words or fetch the URL.
 
-Do not treat `text` as HTML. Scripts and markup are stripped.
+## 3. Fetch or reuse a URL
 
-{pay}
+GET {base}/v1/page?url=https://example.com/pricing&max_age_s=900
 
-## Discovery
-- OpenAPI: GET {base}/openapi.json
+Query:
+- url (required): http or https. No logins, no private/internal addresses.
+- max_age_s (optional, default 900): reuse a stored copy if it is no older than this
+
+Response:
+- cache: "hit" (reused) or "miss" (live fetch)
+- text: readable extract, not HTML
+- hash: sha256 of the raw response body
+- fetched_at, age_s, status, title, final_url
+
+If you already have the URL from a search hit, call /v1/page to get the full text.
+If cache=hit, do not fetch the origin yourself unless you need a smaller max_age_s.
+
+## MCP
+
+POST {base}/mcp
+JSON-RPC. Tools: search_pages, get_page.
+initialize and tools/list are free. tools/call for those two tools needs the same
+Authorization header as HTTP. HTTP 402 if unpaid.
+
+## Other
+
 - Health: GET {base}/health
-- MCP JSON-RPC: POST {base}/mcp  (tools: search_pages, get_page)
-- x402: GET {base}/.well-known/x402
-- A2A: GET {base}/.well-known/agent-card.json
-
-## Rules
-- Never send credentials in the url.
-- Search does not scrape. No hit means fetch with /v1/page, not retry search.
-- If cache=hit, do not refetch the origin unless you need a smaller max_age_s.
-- If status >= 400, the snapshot still describes what the origin returned.
+- OpenAPI: GET {base}/openapi.json
+- Agent card: GET {base}/.well-known/agent-card.json
+- x402 discovery: GET {base}/.well-known/x402
 """
 
 
@@ -105,13 +116,12 @@ def x402_well_known(settings: Settings) -> dict:
     return {
         "x402Version": 2,
         "serviceName": "AfterImage",
-        "description": "Reusable web snapshots with provenance for AI agents.",
+        "description": "Shared copies of public web pages for AI agents. Search first, then fetch.",
         "resources": [
             {
                 "url": resource_url,
                 "description": (
-                    f"GET /v1/page snapshot. Cache hit ${HIT_USDC} USDC, "
-                    f"live fetch ${MISS_USDC} USDC."
+                    f"GET /v1/page. Reuse a stored copy (${HIT_USDC}) or fetch live (${MISS_USDC})."
                 ),
                 "mimeType": "application/json",
                 "accepts": [accept(HIT_ATOMIC), accept(MISS_ATOMIC)],
@@ -119,8 +129,8 @@ def x402_well_known(settings: Settings) -> dict:
             {
                 "url": f"{base}/v1/search",
                 "description": (
-                    f"GET /v1/search corpus query. ${SEARCH_USDC} USDC. "
-                    "Does not fetch the live web."
+                    f"GET /v1/search. Search stored copies only. ${SEARCH_USDC}. "
+                    "Does not visit the live web."
                 ),
                 "mimeType": "application/json",
                 "accepts": [accept(SEARCH_ATOMIC)],
@@ -133,7 +143,10 @@ def agent_card(settings: Settings) -> dict:
     base = settings.public_url.rstrip("/")
     return {
         "name": "AfterImage",
-        "description": "Shared web snapshots for AI agents. Fetch once, reuse with provenance.",
+        "description": (
+            "Shared copies of public web pages for AI agents. "
+            "Search stored pages, or fetch a URL to add/reuse a copy with a timestamp and hash."
+        ),
         "url": base,
         "version": __version__,
         "protocolVersion": "0.3.0",
@@ -145,25 +158,24 @@ def agent_card(settings: Settings) -> dict:
                 "id": "get_page",
                 "name": "Get page snapshot",
                 "description": (
-                    "Return a readable snapshot of a public http(s) URL, reusing a "
-                    "fresh-enough cached copy when one exists. Includes sha256 hash, "
-                    "fetched_at, and cache hit/miss."
+                    "Return readable text for a public http(s) URL. Reuses a stored copy "
+                    "if it is newer than max_age_s. Includes sha256 hash and fetched_at."
                 ),
-                "tags": ["web", "cache", "provenance", "x402"],
+                "tags": ["web", "cache", "search", "http"],
                 "examples": [
-                    "Snapshot https://example.com/pricing if it is no older than 15 minutes"
+                    "Get https://fastapi.tiangolo.com/tutorial/background-tasks/ if it is under 15 minutes old"
                 ],
             },
             {
                 "id": "search_pages",
                 "name": "Search fetched pages",
                 "description": (
-                    "Search the corpus of pages AfterImage has already fetched. "
-                    "Returns snippets, hashes, and fetched_at. Does not scrape the live web."
+                    "Search pages already stored in AfterImage. Does not scrape the live web. "
+                    "Use get_page for the full text of a hit."
                 ),
-                "tags": ["search", "cache", "provenance", "x402"],
+                "tags": ["search", "web", "cache"],
                 "examples": [
-                    "Has anyone already fetched FastAPI background task docs?"
+                    "Search stored pages for FastAPI background tasks"
                 ],
             },
         ],

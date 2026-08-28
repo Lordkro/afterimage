@@ -14,10 +14,12 @@ def test_llms_txt_tells_an_agent_how_to_call_afterimage() -> None:
     assert "AfterImage" in text
     assert "/v1/page" in text
     assert "max_age_s" in text
-    assert "x402" in text.lower()
+    assert "/v1/billing/checkout" in text
+    assert "Authorization" in text
     assert "/mcp" in text
     assert "/v1/search" in text
     assert "sha256" in text
+    assert "x402" in text.lower()
 
 
 def test_openapi_documents_the_page_endpoint() -> None:
