@@ -26,6 +26,7 @@ class PageResponse(BaseModel):
     cache: str
     price_usdc: str
     max_age_s: int = Field(default=DEFAULT_MAX_AGE_S)
+    truncated: bool = False
 
 
 def iso_z(dt: datetime) -> str:
@@ -91,11 +92,15 @@ async def snapshot_page(
         ttl_s=settings.snapshot_ttl_s,
     )
     if existing is not None:
-        return _view(existing, now=now, cache="hit", max_age_s=max_age_s)
+        truncated = _looks_truncated(existing.text, settings.max_text_chars)
+        return _view(
+            existing, now=now, cache="hit", max_age_s=max_age_s, truncated=truncated
+        )
 
     fetched = await fetcher.fetch(url)
-    title, text = extract_readable(fetched.body, fetched.content_type)
-    text = truncate_text(text, settings.max_text_chars)
+    title, raw_text = extract_readable(fetched.body, fetched.content_type)
+    text = truncate_text(raw_text, settings.max_text_chars)
+    truncated = len(raw_text) > len(text)
     snapshot = Snapshot(
         url=url,
         final_url=fetched.final_url,
@@ -110,11 +115,24 @@ async def snapshot_page(
     if keep:
         await store.put(snapshot)
         await prune_corpus(store, settings, clock)
-    return _view(snapshot, now=now, cache="miss", max_age_s=max_age_s)
+    return _view(
+        snapshot, now=now, cache="miss", max_age_s=max_age_s, truncated=truncated
+    )
+
+
+def _looks_truncated(text: str, max_chars: int) -> bool:
+    if max_chars <= 0 or len(text) < max_chars - 1:
+        return False
+    return text.endswith("…")
 
 
 def _view(
-    snapshot: Snapshot, *, now: datetime, cache: str, max_age_s: int
+    snapshot: Snapshot,
+    *,
+    now: datetime,
+    cache: str,
+    max_age_s: int,
+    truncated: bool = False,
 ) -> PageResponse:
     age_s = max(0, int((now - snapshot.fetched_at).total_seconds()))
     return PageResponse(
@@ -129,4 +147,5 @@ def _view(
         cache=cache,
         price_usdc=price_usdc(cache_hit=cache == "hit"),
         max_age_s=max_age_s,
+        truncated=truncated,
     )

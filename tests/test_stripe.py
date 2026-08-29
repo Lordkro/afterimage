@@ -50,6 +50,7 @@ def test_stripe_mode_rejects_unpaid_calls_with_checkout_pointer() -> None:
     assert response.status_code == 402
     body = response.json()
     assert "checkout" in body["error"].lower() or "/v1/billing/checkout" in str(body)
+    assert body["code"] == "missing_key"
 
 
 def test_checkout_mints_a_key_and_webhook_credits_it() -> None:
@@ -76,6 +77,7 @@ def test_checkout_mints_a_key_and_webhook_credits_it() -> None:
     assert paid.status_code == 200
     assert paid.json()["cache"] == "miss"
     assert keys.balance_for_secret(api_key) == 5_000_000 - int(MISS_ATOMIC)
+    assert "x-credits-remaining" in {k.lower() for k in paid.headers}
 
 
 def test_empty_balance_is_rejected() -> None:
@@ -88,6 +90,7 @@ def test_empty_balance_is_rejected() -> None:
     )
     assert response.status_code == 402
     assert keys.balance_for_secret(created["api_key"]) == 0
+    assert response.json()["code"] == "unfunded_key"
 
 
 def test_mcp_initialize_stays_free_in_stripe_mode() -> None:

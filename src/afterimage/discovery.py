@@ -4,7 +4,6 @@ from urllib.parse import urlparse
 
 from afterimage import __version__
 from afterimage.pricing import (
-    HIT_ATOMIC,
     HIT_USDC,
     MISS_ATOMIC,
     MISS_USDC,
@@ -85,8 +84,13 @@ Send it on every later request:
 
   Authorization: Bearer ak_live_…
 
-HTTP 402 means the header is missing or the key has no credits left. Buy another pack.
+HTTP 402 means unpaid. The JSON field code is one of:
+- missing_key: no Authorization header (x402 clients pay here)
+- unknown_key: bearer token is not a key from this instance
+- unfunded_key: key was created but never paid for
+- insufficient_credits: key is empty; buy another pack
 GET {base}/v1/billing/balance with the same header to see remaining dollars.
+Successful billed responses also send X-Credits-Remaining.
 
 Prices:
 - GET /v1/search = ${SEARCH_USDC} per call
@@ -108,6 +112,7 @@ Query:
 Response:
 - indexed: how many copies are stored
 - hits[]: url, title, snippet, hash, fetched_at, age_s, status, score
+GET {base}/v1/stats is free and returns live indexed plus caps.
 If indexed is 0, the library is empty. Fetch URLs with /v1/page, then search again.
 If hits is empty but indexed > 0, nothing matched. Try different words or fetch the URL.
 
@@ -124,6 +129,7 @@ Response:
 - text: readable extract, not HTML
 - hash: sha256 of the raw response body
 - fetched_at, age_s, status, title, final_url
+- truncated: true if text hit the character cap
 
 If you already have the URL from a search hit, call /v1/page to get the full text.
 If cache=hit, do not fetch the origin yourself unless you need a smaller max_age_s.
@@ -140,10 +146,21 @@ Also: GET {base}/mcp/server-card
 
 ## Other
 
-- Health: GET {base}/health
+- Health: GET {base}/health (includes live indexed)
+- Stats: GET {base}/v1/stats (free; indexed and caps)
 - OpenAPI: GET {base}/openapi.json
 - Agent card: GET {base}/.well-known/agent-card.json
 - x402 discovery: GET {base}/.well-known/x402
+- robots.txt: GET {base}/robots.txt
+
+## Policy
+
+AfterImage caches public http(s) pages for agents. It rejects private/internal
+addresses and does not follow logins. It does not currently honor origin
+robots.txt or noarchive. Copies are evicted after 7 days or when the 5,000-page
+cap drops the oldest. Caps and live size: GET {base}/v1/stats.
+To request removal of a URL from this instance, email the operator; otherwise
+wait for TTL eviction.
 """
 
 
@@ -178,7 +195,7 @@ def x402_well_known(settings: Settings) -> dict:
                     f"GET /v1/page. Reuse a stored copy (${HIT_USDC}) or fetch live (${MISS_USDC})."
                 ),
                 "mimeType": "application/json",
-                "accepts": [accept(HIT_ATOMIC), accept(MISS_ATOMIC)] if pay_to else [],
+                "accepts": [accept(MISS_ATOMIC)] if pay_to else [],
                 "extensions": bazaar_extension("/v1/page"),
             },
             {
@@ -195,9 +212,7 @@ def x402_well_known(settings: Settings) -> dict:
                 "url": f"{base}/mcp",
                 "description": "MCP tools search_pages and get_page over streamable HTTP.",
                 "mimeType": "application/json",
-                "accepts": [accept(SEARCH_ATOMIC), accept(HIT_ATOMIC), accept(MISS_ATOMIC)]
-                if pay_to
-                else [],
+                "accepts": [accept(MISS_ATOMIC)] if pay_to else [],
                 "extensions": bazaar_extension("/mcp", tool_name="get_page"),
             },
         ],
@@ -208,19 +223,31 @@ def agent_card(settings: Settings) -> dict:
     base = settings.public_url.rstrip("/")
     return {
         "name": "AfterImage",
-        "description": DESCRIPTION,
+        "description": (
+            DESCRIPTION
+            + " Paid: Authorization Bearer ak_live_… or x402. HTTP 402 if unpaid."
+        ),
         "url": base,
         "version": __version__,
         "protocolVersion": "0.3.0",
         "capabilities": {"streaming": False},
         "defaultInputModes": ["text"],
         "defaultOutputModes": ["application/json"],
+        "securitySchemes": {
+            "bearer": {
+                "type": "apiKey",
+                "in": "header",
+                "name": "Authorization",
+                "description": "Bearer ak_live_… from POST /v1/billing/checkout, or x402 PAYMENT-SIGNATURE.",
+            }
+        },
+        "security": [{"bearer": []}],
         "skills": [
             {
                 "id": "get_page",
                 "name": "Get page snapshot",
                 "description": (
-                    "Return readable text for a public http(s) URL. Reuses a stored copy "
+                    "Paid. Return readable text for a public http(s) URL. Reuses a stored copy "
                     "if it is newer than max_age_s. Includes sha256 hash and fetched_at."
                 ),
                 "tags": ["web", "cache", "search", "http"],
@@ -232,7 +259,7 @@ def agent_card(settings: Settings) -> dict:
                 "id": "search_pages",
                 "name": "Search fetched pages",
                 "description": (
-                    "Search pages already stored in AfterImage. Does not scrape the live web. "
+                    "Paid. Search pages already stored in AfterImage. Does not scrape the live web. "
                     "Use get_page for the full text of a hit."
                 ),
                 "tags": ["search", "web", "cache"],

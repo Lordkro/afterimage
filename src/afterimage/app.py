@@ -5,7 +5,13 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, Response
 
 from afterimage import __version__
-from afterimage.checkout import Checkout, StripeCheckout, _get, apply_paid_session
+from afterimage.checkout import (
+    Checkout,
+    CheckoutRequest,
+    StripeCheckout,
+    _get,
+    apply_paid_session,
+)
 from afterimage.clock import SystemClock
 from afterimage.discovery import (
     MCP_REGISTRY_AUTH,
@@ -32,7 +38,8 @@ from afterimage.search import (
 )
 from afterimage.settings import Settings, paid_mode
 from afterimage.store import SqliteSnapshotStore
-from afterimage.x402 import Facilitator, require_payment, settlement_headers, unpaid_response
+from afterimage.rate_limit import SlidingWindow
+from afterimage.x402 import Facilitator, billed_headers, require_payment, unpaid_response
 
 
 def create_app(
@@ -62,7 +69,10 @@ def create_app(
     app = FastAPI(
         title="AfterImage",
         version=__version__,
-        description="Shared copies of public web pages for AI agents. Search stored pages or fetch a URL.",
+        description=(
+            "Shared copies of public web pages for AI agents. "
+            "Send Authorization: Bearer ak_live_… or pay with x402. HTTP 402 if unpaid."
+        ),
     )
     app.state.fetcher = fetcher
     app.state.store = store
@@ -71,6 +81,7 @@ def create_app(
     app.state.facilitator = facilitator
     app.state.keys = keys
     app.state.checkout = checkout
+    app.state.checkout_limit = SlidingWindow(max_hits=10, window_s=600)
 
     @app.exception_handler(RequestValidationError)
     async def challenge_before_invalid_query(
@@ -96,13 +107,29 @@ def create_app(
             )
         return JSONResponse(status_code=422, content={"detail": exc.errors()})
 
+    async def _stats() -> dict:
+        indexed = 0
+        if app.state.store is not None:
+            indexed = await app.state.store.count()
+        return {
+            "indexed": indexed,
+            "max_snapshots": app.state.settings.max_snapshots,
+            "max_text_chars": app.state.settings.max_text_chars,
+            "snapshot_ttl_s": app.state.settings.snapshot_ttl_s,
+        }
+
     @app.get("/", response_class=HTMLResponse, include_in_schema=False)
     def home() -> str:
         return landing_html(app.state.settings)
 
     @app.get("/health")
-    def health() -> dict[str, str]:
-        return {"status": "ok", "service": "afterimage"}
+    async def health() -> dict:
+        stats = await _stats()
+        return {"status": "ok", "service": "afterimage", **stats}
+
+    @app.get("/v1/stats")
+    async def stats() -> dict:
+        return await _stats()
 
     @app.get("/llms.txt", response_class=PlainTextResponse, include_in_schema=False)
     def get_llms_txt() -> str:
@@ -175,7 +202,7 @@ def create_app(
         responses={
             200: {"model": PageResponse, "description": "Readable snapshot"},
             400: {"description": "URL is not fetchable"},
-            402: {"description": "x402 payment required"},
+            402: {"description": "Payment required (API key or x402)"},
         },
     )
     async def get_page(
@@ -216,8 +243,7 @@ def create_app(
         if payment is None:
             return page
         response = JSONResponse(page.model_dump())
-        if payment.get("rail") != "stripe":
-            response.headers.update(settlement_headers(payment))
+        response.headers.update(billed_headers(payment))
         return response
 
     @app.get(
@@ -225,7 +251,7 @@ def create_app(
         response_model=None,
         responses={
             200: {"model": SearchResponse, "description": "Corpus hits"},
-            402: {"description": "x402 payment required"},
+            402: {"description": "Payment required (API key or x402)"},
             422: {"description": "Query is empty"},
         },
     )
@@ -263,11 +289,14 @@ def create_app(
         if payment is None:
             return result
         response = JSONResponse(result.model_dump())
-        if payment.get("rail") != "stripe":
-            response.headers.update(settlement_headers(payment))
+        response.headers.update(billed_headers(payment))
         return response
 
-    @app.post("/mcp", response_model=None)
+    @app.post(
+        "/mcp",
+        response_model=None,
+        responses={402: {"description": "Payment required (API key or x402)"}},
+    )
     async def mcp_endpoint(request: Request, message: dict) -> dict | Response:
         if app.state.fetcher is None or app.state.store is None:
             raise RuntimeError("AfterImage is not configured with a fetcher and store")
@@ -317,12 +346,21 @@ def create_app(
         return reply
 
     @app.post("/v1/billing/checkout")
-    async def billing_checkout(body: dict | None = None) -> JSONResponse:
+    async def billing_checkout(
+        request: Request, body: CheckoutRequest = CheckoutRequest()
+    ) -> JSONResponse:
         if app.state.keys is None or app.state.checkout is None:
             return JSONResponse(
                 status_code=503, content={"error": "Stripe billing is not configured"}
             )
-        pack = get_pack((body or {}).get("pack") or "starter")
+        ip = (request.headers.get("x-forwarded-for") or "").split(",")[0].strip()
+        if not ip and request.client:
+            ip = request.client.host
+        if ip and not app.state.checkout_limit.allow(ip):
+            return JSONResponse(
+                status_code=429, content={"error": "checkout rate limit"}
+            )
+        pack = get_pack(body.pack or "starter")
         if pack is None:
             return JSONResponse(
                 status_code=422,
@@ -367,7 +405,7 @@ def create_app(
         status = 200 if result.get("credited") else 402
         return JSONResponse(result, status_code=status)
 
-    @app.post("/v1/billing/webhook")
+    @app.post("/v1/billing/webhook", include_in_schema=False)
     async def billing_webhook(request: Request) -> JSONResponse:
         if not app.state.settings.stripe_webhook_secret:
             return JSONResponse(status_code=503, content={"error": "webhook not configured"})
@@ -395,6 +433,45 @@ def create_app(
             return JSONResponse({"error": "session_id required"}, status_code=422)
         return await _fulfill(session_id)
 
+    @app.get("/robots.txt", response_class=PlainTextResponse, include_in_schema=False)
+    def robots() -> str:
+        base = app.state.settings.public_url.rstrip("/")
+        return (
+            "# AfterImage caches public pages for AI agents. See /llms.txt Policy.\n"
+            "User-agent: *\n"
+            "Allow: /\n"
+            f"Allow: /llms.txt\n"
+            f"# Live corpus size: {base}/v1/stats\n"
+        )
+
+    def custom_openapi() -> dict:
+        if app.openapi_schema:
+            return app.openapi_schema
+        from fastapi.openapi.utils import get_openapi
+
+        schema = get_openapi(
+            title=app.title,
+            version=app.version,
+            description=app.description,
+            routes=app.routes,
+        )
+        schema.setdefault("components", {})["securitySchemes"] = {
+            "BearerAuth": {
+                "type": "http",
+                "scheme": "bearer",
+                "bearerFormat": "API key",
+                "description": "ak_live_… from POST /v1/billing/checkout. HTTP 402 if missing or empty. x402 PAYMENT-SIGNATURE is an alternative.",
+            }
+        }
+        for path in ("/v1/page", "/v1/search", "/v1/billing/balance", "/mcp"):
+            item = schema.get("paths", {}).get(path) or {}
+            for op in item.values():
+                if isinstance(op, dict):
+                    op.setdefault("security", [{"BearerAuth": []}])
+        app.openapi_schema = schema
+        return schema
+
+    app.openapi = custom_openapi  # type: ignore[method-assign]
     return app
 
 

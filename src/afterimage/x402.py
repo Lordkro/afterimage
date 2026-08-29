@@ -93,7 +93,7 @@ def _mcp_bazaar(tool_name: str) -> dict[str, Any]:
         description = "Search pages already stored in AfterImage. Does not visit the live web."
         output = {
             "q": "fastapi background tasks",
-            "indexed": 99,
+            "indexed": 3,
             "hits": [
                 {
                     "url": "https://fastapi.tiangolo.com/",
@@ -183,7 +183,7 @@ def bazaar_extension(
                 required_query=["q"],
                 output_example={
                     "q": "fastapi background tasks",
-                    "indexed": 99,
+                    "indexed": 3,
                     "hits": [
                         {
                             "url": "https://fastapi.tiangolo.com/",
@@ -269,6 +269,18 @@ def settlement_headers(result: dict) -> dict[str, str]:
     return {"PAYMENT-RESPONSE": b64json_encode(result)}
 
 
+def billed_headers(payment: dict | None) -> dict[str, str]:
+    if not payment:
+        return {}
+    headers: dict[str, str] = {}
+    if payment.get("rail") != "stripe":
+        headers.update(settlement_headers(payment))
+    remaining = payment.get("credits_remaining")
+    if remaining is not None:
+        headers["X-Credits-Remaining"] = f"{float(remaining):.6f}".rstrip("0").rstrip(".")
+    return headers
+
+
 def _bearer_secret(request: Request) -> str | None:
     auth = request.headers.get("authorization") or ""
     if auth.lower().startswith("bearer "):
@@ -285,10 +297,12 @@ def unpaid_response(
     description: str,
     error: str,
     tool_name: str | None = None,
+    code: str = "missing_key",
 ) -> JSONResponse:
     public = settings.public_url.rstrip("/")
     body: dict = {
         "error": error,
+        "code": code,
         "checkout": f"POST {public}/v1/billing/checkout",
         "authorization": "Authorization: Bearer ak_live_…",
     }
@@ -327,16 +341,47 @@ async def require_payment(
         return None
     secret = _bearer_secret(request)
     if keys is not None and secret:
+        remaining = await keys.balance(secret)
+        if remaining is None:
+            return unpaid_response(
+                settings=settings,
+                resource_path=resource_path,
+                amount=amount,
+                description=description,
+                error="Unknown API key.",
+                tool_name=tool_name,
+                code="unknown_key",
+            )
         ok = await keys.debit(secret, int(amount))
         if ok:
-            return {"success": True, "rail": "stripe"}
+            left = await keys.balance(secret)
+            return {
+                "success": True,
+                "rail": "stripe",
+                "credits_remaining": (left or 0) / 1_000_000,
+            }
+        ever = await keys.ever_credited(secret)
+        if not ever:
+            return unpaid_response(
+                settings=settings,
+                resource_path=resource_path,
+                amount=amount,
+                description=description,
+                error=(
+                    "This key has never been funded. Pay checkout_url from "
+                    "POST /v1/billing/checkout."
+                ),
+                tool_name=tool_name,
+                code="unfunded_key",
+            )
         return unpaid_response(
             settings=settings,
             resource_path=resource_path,
             amount=amount,
             description=description,
-            error="API key missing credits. POST /v1/billing/checkout to top up.",
+            error="API key is out of credits. POST /v1/billing/checkout to top up.",
             tool_name=tool_name,
+            code="insufficient_credits",
         )
     signature = request.headers.get("payment-signature") or request.headers.get(
         "x-payment"
@@ -371,6 +416,7 @@ async def require_payment(
         description=description,
         error="Payment required. Buy credits via Stripe checkout or pay with x402.",
         tool_name=tool_name,
+        code="missing_key",
     )
 
 

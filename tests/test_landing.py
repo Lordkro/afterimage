@@ -22,3 +22,8 @@ def test_root_is_a_human_landing_page() -> None:
     assert "/v1/search" in text
     assert "https://afterimage.page" in text
     assert "Authorization" in text
+    assert 'id="keybox"' not in text
+    assert 'href="#"' not in text
+    assert "AfterImageAfterImage" not in text
+    assert "Caps:" in text
+    assert "About 5,000" not in text

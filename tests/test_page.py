@@ -52,6 +52,7 @@ def test_page_fetch_returns_readable_snapshot_on_miss() -> None:
     assert body["age_s"] == 0
     assert body["cache"] == "miss"
     assert body["price_usdc"] == "0.01"
+    assert body["truncated"] is False
 
 
 def test_fresh_snapshot_is_reused_instead_of_refetching() -> None:

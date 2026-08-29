@@ -25,6 +25,8 @@ class KeyStore(Protocol):
 
     async def balance(self, secret: str) -> int | None: ...
 
+    async def ever_credited(self, secret: str) -> bool | None: ...
+
 
 class MemoryKeyStore:
     def __init__(self) -> None:
@@ -38,7 +40,7 @@ class MemoryKeyStore:
         key_id = f"key_{self._n}"
         secret = new_secret()
         digest = hash_secret(secret)
-        self._by_id[key_id] = {"hash": digest, "micros": 0}
+        self._by_id[key_id] = {"hash": digest, "micros": 0, "credited": 0}
         self._by_hash[digest] = key_id
         return key_id, secret
 
@@ -68,7 +70,14 @@ class MemoryKeyStore:
             return False
         self._sessions.add(stripe_session)
         self._by_id[key_id]["micros"] += micros
+        self._by_id[key_id]["credited"] = int(self._by_id[key_id].get("credited") or 0) + micros
         return True
+
+    async def ever_credited(self, secret: str) -> bool | None:
+        key_id = self._by_hash.get(hash_secret(secret))
+        if key_id is None:
+            return None
+        return int(self._by_id[key_id].get("credited") or 0) > 0
 
     async def credit(self, key_id: str, micros: int, stripe_session: str) -> bool:
         return self.apply_credit(key_id, micros, stripe_session)
@@ -147,3 +156,16 @@ class SqliteKeyStore:
         )
         self._conn.commit()
         return True
+
+    async def ever_credited(self, secret: str) -> bool | None:
+        row = self._conn.execute(
+            "SELECT id FROM api_keys WHERE secret_hash = ?",
+            (hash_secret(secret),),
+        ).fetchone()
+        if row is None:
+            return None
+        credited = self._conn.execute(
+            "SELECT 1 FROM stripe_credits WHERE key_id = ? LIMIT 1",
+            (row[0],),
+        ).fetchone()
+        return credited is not None

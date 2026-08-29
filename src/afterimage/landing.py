@@ -47,14 +47,15 @@ def landing_html(settings: Settings) -> str:
       letter-spacing: -0.045em;
       line-height: 0.92;
     }}
-    .ghost {{
+    .mark::before {{
+      content: "AfterImage";
       position: absolute;
-      inset: 0.07em 0 0 0.14em;
+      left: 0.14em;
+      top: 0.07em;
       color: var(--amber);
       opacity: 0.32;
       filter: blur(0.4px);
       pointer-events: none;
-      user-select: none;
     }}
     p.lead {{ font-size: 1.2rem; margin: 0 0 1.5rem; }}
     p {{ margin: 0 0 1rem; color: var(--paper); }}
@@ -112,13 +113,11 @@ def landing_html(settings: Settings) -> str:
       color: #d8cbb3;
     }}
     #keybox {{
-      display: none;
       margin: 1rem 0 1.5rem;
       padding: 1rem;
       border: 1px solid var(--amber);
       background: var(--card);
     }}
-    #keybox.show {{ display: block; }}
     #keybox code {{
       display: block;
       font-family: var(--mono);
@@ -138,13 +137,13 @@ def landing_html(settings: Settings) -> str:
       pre {{ font-size: 0.7rem; }}
     }}
     @media (prefers-reduced-motion: reduce) {{
-      .ghost {{ filter: none; }}
+      .mark::before {{ filter: none; }}
     }}
   </style>
 </head>
 <body>
   <main>
-    <h1 class="mark"><span class="ghost" aria-hidden="true">AfterImage</span>AfterImage</h1>
+    <h1 class="mark">AfterImage</h1>
     <p class="lead">A shared copy of the public web for AI agents.</p>
     <p>If another agent already fetched a page, yours can reuse that copy — timestamp plus sha256 of the raw bytes — instead of scraping again. Search the copies. Humans buy credits; agents send an API key.</p>
     <ul class="prices">
@@ -158,14 +157,6 @@ def landing_html(settings: Settings) -> str:
       <button type="button" class="secondary" id="buy20" data-pack="builder">Buy $20</button>
       <a class="btn secondary" href="/llms.txt">Agent brief (llms.txt)</a>
     </div>
-    <div id="keybox" role="status">
-      <p class="warn">Save this key now. Stripe will not show it again.</p>
-      <code id="key"></code>
-      <div class="actions">
-        <button type="button" id="copy">Copy key</button>
-        <a class="btn" id="pay" href="#">Pay on Stripe</a>
-      </div>
-    </div>
     <p class="muted">Or from a terminal:</p>
     <pre>curl -sS -X POST {base}/v1/billing/checkout \\
   -H 'content-type: application/json' \\
@@ -177,7 +168,8 @@ curl -sS '{base}/v1/search?q=fastapi+background+tasks' \\
 curl -sS '{base}/v1/page?url=https://example.com/&amp;max_age_s=900' \\
   -H "Authorization: Bearer ak_live_…"</pre>
     <footer>
-      Cache, not an archive. About 5,000 pages, 32,000 characters each, 7 days old.
+      Caps: 5,000 pages, 32,000 characters per page, evicted after 7 days.
+      Live size: GET {base}/v1/stats (free).
       Agents start at <a href="{base}/llms.txt">{base}/llms.txt</a>.
     </footer>
   </main>
@@ -195,11 +187,26 @@ curl -sS '{base}/v1/page?url=https://example.com/&amp;max_age_s=900' \\
         if (!response.ok) {{
           throw new Error(body.error || "checkout failed");
         }}
+        let box = document.getElementById("keybox");
+        if (!box) {{
+          box = document.createElement("div");
+          box.id = "keybox";
+          box.setAttribute("role", "status");
+          box.innerHTML = '<p class="warn">Save this key now. Stripe will not show it again.</p>'
+            + '<code id="key"></code>'
+            + '<div class="actions">'
+            + '<button type="button" id="copy">Copy key</button>'
+            + '<a class="btn" id="pay">Pay on Stripe</a>'
+            + '</div>';
+          const actions = document.querySelector(".actions");
+          actions.after(box);
+          document.getElementById("copy").addEventListener("click", async () => {{
+            await navigator.clipboard.writeText(document.getElementById("key").textContent);
+          }});
+        }}
         document.getElementById("key").textContent = body.api_key;
-        const pay = document.getElementById("pay");
-        pay.href = body.checkout_url;
-        document.getElementById("keybox").classList.add("show");
-        document.getElementById("keybox").scrollIntoView({{ behavior: "smooth", block: "nearest" }});
+        document.getElementById("pay").setAttribute("href", body.checkout_url);
+        box.scrollIntoView({{ behavior: "smooth", block: "nearest" }});
       }} catch (err) {{
         alert(err.message || "Could not start checkout");
       }} finally {{
@@ -208,10 +215,6 @@ curl -sS '{base}/v1/page?url=https://example.com/&amp;max_age_s=900' \\
     }}
     document.getElementById("buy").addEventListener("click", () => buy("starter"));
     document.getElementById("buy20").addEventListener("click", () => buy("builder"));
-    document.getElementById("copy").addEventListener("click", async () => {{
-      const key = document.getElementById("key").textContent;
-      await navigator.clipboard.writeText(key);
-    }});
   </script>
 </body>
 </html>

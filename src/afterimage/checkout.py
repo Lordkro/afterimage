@@ -2,8 +2,14 @@ from __future__ import annotations
 
 from typing import Any, Protocol
 
+from pydantic import BaseModel, Field
+
 from afterimage.keys import KeyStore
 from afterimage.packs import get_pack
+
+
+class CheckoutRequest(BaseModel):
+    pack: str = Field(default="starter", description="starter ($5) or builder ($20)")
 
 
 def _get(obj: Any, key: str, default: Any = None) -> Any:
