@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Literal, Protocol
 
@@ -12,6 +12,7 @@ class FetchResult:
     status: int
     body: bytes
     content_type: str
+    headers: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -36,6 +37,8 @@ class SnapshotStore(Protocol):
     async def put(self, snapshot: Snapshot) -> None: ...
 
     async def count(self) -> int: ...
+
+    async def oldest_fetched_at(self) -> datetime | None: ...
 
     async def search(self, tokens: list[str], *, limit: int) -> list[Snapshot]: ...
 

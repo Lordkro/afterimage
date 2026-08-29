@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from pydantic import BaseModel, Field
 
 from afterimage.extract import extract_readable
+from afterimage.robots_archive import forbids_archive
 from afterimage.hashing import sha256_bytes
 from afterimage.models import Clock, Fetcher, Snapshot, SnapshotStore
 from afterimage.pricing import price_usdc
@@ -27,6 +28,7 @@ class PageResponse(BaseModel):
     price_usdc: str
     max_age_s: int = Field(default=DEFAULT_MAX_AGE_S)
     truncated: bool = False
+    stored: bool = True
 
 
 def iso_z(dt: datetime) -> str:
@@ -94,7 +96,12 @@ async def snapshot_page(
     if existing is not None:
         truncated = _looks_truncated(existing.text, settings.max_text_chars)
         return _view(
-            existing, now=now, cache="hit", max_age_s=max_age_s, truncated=truncated
+            existing,
+            now=now,
+            cache="hit",
+            max_age_s=max_age_s,
+            truncated=truncated,
+            stored=True,
         )
 
     fetched = await fetcher.fetch(url)
@@ -111,12 +118,22 @@ async def snapshot_page(
         fetched_at=now,
         content_type=fetched.content_type,
     )
-    keep = settings.persist_error_pages or snapshot.status < 400
+    noarchive = forbids_archive(
+        headers=fetched.headers,
+        body=fetched.body,
+        content_type=fetched.content_type,
+    )
+    keep = (settings.persist_error_pages or snapshot.status < 400) and not noarchive
     if keep:
         await store.put(snapshot)
         await prune_corpus(store, settings, clock)
     return _view(
-        snapshot, now=now, cache="miss", max_age_s=max_age_s, truncated=truncated
+        snapshot,
+        now=now,
+        cache="miss",
+        max_age_s=max_age_s,
+        truncated=truncated,
+        stored=keep,
     )
 
 
@@ -133,6 +150,7 @@ def _view(
     cache: str,
     max_age_s: int,
     truncated: bool = False,
+    stored: bool = True,
 ) -> PageResponse:
     age_s = max(0, int((now - snapshot.fetched_at).total_seconds()))
     return PageResponse(
@@ -148,4 +166,5 @@ def _view(
         price_usdc=price_usdc(cache_hit=cache == "hit"),
         max_age_s=max_age_s,
         truncated=truncated,
+        stored=stored,
     )

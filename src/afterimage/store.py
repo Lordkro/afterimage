@@ -103,6 +103,13 @@ class SqliteSnapshotStore:
             row = self._conn.execute("SELECT COUNT(*) FROM snapshots").fetchone()
         return int(row[0]) if row else 0
 
+    async def oldest_fetched_at(self) -> datetime | None:
+        async with self._lock:
+            row = self._conn.execute("SELECT MIN(fetched_at) FROM snapshots").fetchone()
+        if not row or not row[0]:
+            return None
+        return datetime.fromisoformat(str(row[0])).astimezone(UTC)
+
     async def search(self, tokens: list[str], *, limit: int) -> list[Snapshot]:
         if not tokens:
             return []

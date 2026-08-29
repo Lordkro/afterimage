@@ -159,8 +159,9 @@ AfterImage caches public http(s) pages for agents. It rejects private/internal
 addresses and does not follow logins. It does not currently honor origin
 robots.txt or noarchive. Copies are evicted after 7 days or when the 5,000-page
 cap drops the oldest. Caps and live size: GET {base}/v1/stats.
-To request removal of a URL from this instance, email the operator; otherwise
-wait for TTL eviction.
+Live fetch honors noarchive (meta robots and X-Robots-Tag): the caller still
+gets the page, AfterImage does not store it.
+To request removal of a stored URL, email {settings.removal_email}.
 """
 
 

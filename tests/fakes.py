@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
 from afterimage.models import FetchResult, Snapshot
@@ -12,6 +12,7 @@ class FakePage:
     status: int = 200
     content_type: str = "text/html; charset=utf-8"
     final_url: str | None = None
+    headers: dict[str, str] = field(default_factory=dict)
 
 
 class FakeFetcher:
@@ -28,6 +29,7 @@ class FakeFetcher:
             status=page.status,
             body=page.body,
             content_type=page.content_type,
+            headers=page.headers,
         )
 
 
@@ -43,6 +45,11 @@ class MemorySnapshotStore:
 
     async def count(self) -> int:
         return len(self._by_url)
+
+    async def oldest_fetched_at(self) -> datetime | None:
+        if not self._by_url:
+            return None
+        return min(item.fetched_at for item in self._by_url.values())
 
     async def search(self, tokens: list[str], *, limit: int) -> list[Snapshot]:
         hits: list[Snapshot] = []

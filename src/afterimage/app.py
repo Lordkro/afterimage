@@ -28,7 +28,7 @@ from afterimage.keys import KeyStore, SqliteKeyStore
 from afterimage.mcp import handle_rpc
 from afterimage.models import Clock, Fetcher, SnapshotStore
 from afterimage.packs import PACKS, get_pack
-from afterimage.pages import DEFAULT_MAX_AGE_S, PageResponse, fresh_snapshot, snapshot_page
+from afterimage.pages import DEFAULT_MAX_AGE_S, PageResponse, fresh_snapshot, iso_z, snapshot_page
 from afterimage.pricing import SEARCH_ATOMIC, price_atomic
 from afterimage.search import (
     DEFAULT_SEARCH_LIMIT,
@@ -83,6 +83,19 @@ def create_app(
     app.state.checkout = checkout
     app.state.checkout_limit = SlidingWindow(max_hits=10, window_s=600)
 
+    @app.middleware("http")
+    async def no_store_live_docs(request: Request, call_next):
+        response = await call_next(request)
+        if request.url.path in {
+            "/health",
+            "/v1/stats",
+            "/llms.txt",
+            "/openapi.json",
+            "/robots.txt",
+        }:
+            response.headers["Cache-Control"] = "no-store"
+        return response
+
     @app.exception_handler(RequestValidationError)
     async def challenge_before_invalid_query(
         request: Request, exc: RequestValidationError
@@ -109,13 +122,23 @@ def create_app(
 
     async def _stats() -> dict:
         indexed = 0
+        oldest_fetched_at = None
+        oldest_age_s = None
         if app.state.store is not None:
             indexed = await app.state.store.count()
+            oldest = await app.state.store.oldest_fetched_at()
+            if oldest is not None:
+                oldest_fetched_at = iso_z(oldest)
+                oldest_age_s = max(
+                    0, int((app.state.clock.now() - oldest).total_seconds())
+                )
         return {
             "indexed": indexed,
             "max_snapshots": app.state.settings.max_snapshots,
             "max_text_chars": app.state.settings.max_text_chars,
             "snapshot_ttl_s": app.state.settings.snapshot_ttl_s,
+            "oldest_fetched_at": oldest_fetched_at,
+            "oldest_age_s": oldest_age_s,
         }
 
     @app.get("/", response_class=HTMLResponse, include_in_schema=False)

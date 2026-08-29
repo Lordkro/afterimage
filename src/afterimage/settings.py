@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     max_text_chars: int = 32_000
     snapshot_ttl_s: int = 7 * 24 * 60 * 60
     persist_error_pages: bool = False
+    removal_email: str = "removal@afterimage.page"
 
 
 def paid_mode(settings: Settings) -> bool:

@@ -24,7 +24,9 @@ def test_llms_txt_tells_an_agent_how_to_call_afterimage() -> None:
     assert "x402" in text.lower()
     assert "/v1/stats" in text
     assert "robots.txt" in text.lower() or "robots.txt" in text
-    assert "does not honor" in text.lower() or "does not currently honor" in text.lower()
+    assert "does not currently honor" in text.lower()
+    assert "noarchive" in text.lower()
+    assert "removal@afterimage.page" in text
 
 
 def test_openapi_documents_the_page_endpoint() -> None:

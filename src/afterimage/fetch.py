@@ -81,6 +81,7 @@ class HttpxFetcher:
                     status=response.status_code,
                     body=body,
                     content_type=response.headers.get("content-type", "application/octet-stream"),
+                    headers={k.lower(): v for k, v in response.headers.items()},
                 )
             raise HTTPException(status_code=400, detail="too many redirects")
         finally:
