@@ -421,7 +421,7 @@ button:disabled { opacity: 0.55; cursor: wait; }
   padding: 0.35rem 0.6rem;
   font-size: 0.7rem;
 }
-pre {
+.term pre {
   margin: 0;
   padding: 1rem 1.1rem 1.15rem;
   overflow-x: auto;
@@ -431,7 +431,11 @@ pre {
   color: #d8cbb3;
   display: none;
 }
-pre.on { display: block; }
+.term pre.on { display: block; }
+.nav-links a[aria-current="page"] { color: var(--paper); }
+.docs-hero { grid-template-columns: 1fr; padding-bottom: 1.4rem; }
+.docs-hero .lead { max-width: 22ch; }
+.spec { padding-top: 0.4rem; padding-bottom: 3.4rem; }
 #keybox {
   margin: 1rem 0 0.4rem;
   padding: 1.05rem 1.1rem 1.15rem;
@@ -495,7 +499,7 @@ footer.site {
   .prices, .steps, .packs, .meta-grid { grid-template-columns: 1fr; }
   .nav { align-items: flex-start; }
   .hero { padding-top: 2.2rem; }
-  pre { font-size: 0.7rem; }
+  .term pre { font-size: 0.7rem; }
   .dots { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -503,6 +507,146 @@ footer.site {
   button, .btn, .carrier { transition: none; }
   .carrier:hover { transform: rotate(-1.1deg); }
 }
+"""
+
+_SWAGGER_CSS = """
+.swagger-ui { font-family: var(--serif); color: var(--paper); background: transparent; }
+.swagger-ui .topbar, .swagger-ui .information-container { display: none; }
+.swagger-ui .wrapper { padding: 0; max-width: none; }
+.swagger-ui .scheme-container {
+  background: var(--card);
+  box-shadow: none;
+  border: 1px solid var(--line);
+  margin: 0 0 1.2rem;
+  padding: 1rem 1.1rem;
+}
+.swagger-ui .filter-container { padding: 0 0 1rem; }
+.swagger-ui .operation-filter-input {
+  background: #0c0b09;
+  color: var(--paper);
+  border: 1px solid var(--line-2);
+  border-radius: 0;
+  font-family: var(--mono);
+}
+.swagger-ui .opblock-tag {
+  color: var(--paper);
+  border-bottom: 1px solid var(--line);
+  font-family: var(--serif);
+  font-size: 1.2rem;
+  font-weight: 500;
+}
+.swagger-ui .opblock-tag small { color: var(--muted); font-family: var(--mono); }
+.swagger-ui .opblock {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 0;
+  box-shadow: none;
+  margin: 0 0 0.55rem;
+}
+.swagger-ui .opblock .opblock-summary { border: 0; padding: 0.5rem 0.65rem; }
+.swagger-ui .opblock-summary-method {
+  font-family: var(--mono);
+  font-weight: 500;
+  min-width: 4.4rem;
+  border-radius: 0;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+}
+.swagger-ui .opblock-summary-path, .swagger-ui .opblock-summary-path__deprecated {
+  color: var(--paper);
+  font-family: var(--mono);
+  font-size: 0.86rem;
+}
+.swagger-ui .opblock-summary-description { color: var(--muted); }
+.swagger-ui .opblock-body { background: transparent; }
+.swagger-ui .opblock-section-header {
+  background: #14110d;
+  box-shadow: none;
+  border: 0;
+  border-radius: 0;
+}
+.swagger-ui .opblock-section-header h4, .swagger-ui .opblock-title,
+.swagger-ui .tab li, .swagger-ui .response-col_status,
+.swagger-ui .response-col_links, .swagger-ui .parameter__name,
+.swagger-ui table thead tr td, .swagger-ui table thead tr th,
+.swagger-ui .response-col_description, .swagger-ui label,
+.swagger-ui .model, .swagger-ui .model-title, .swagger-ui .prop-type {
+  color: var(--paper);
+}
+.swagger-ui .parameter__type, .swagger-ui .parameter__in,
+.swagger-ui .parameter__empty_value_toggle, .swagger-ui .opblock-description-wrapper p,
+.swagger-ui .opblock-external-docs-wrapper, .swagger-ui .renderedMarkdown p {
+  color: var(--muted);
+}
+.swagger-ui input[type=text], .swagger-ui input[type=password],
+.swagger-ui input[type=search], .swagger-ui textarea, .swagger-ui select {
+  background: #0c0b09;
+  color: var(--paper);
+  border: 1px solid var(--line-2);
+  border-radius: 0;
+  font-family: var(--mono);
+  box-shadow: none;
+}
+.swagger-ui .model-box, .swagger-ui section.models {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 0;
+}
+.swagger-ui section.models h4 { color: var(--paper); }
+.swagger-ui .highlight-code, .swagger-ui .microlight,
+.swagger-ui .opblock-body pre {
+  background: #0e0c09 !important;
+  color: #d8cbb3 !important;
+  border-radius: 0;
+  font-family: var(--mono);
+}
+.swagger-ui button {
+  background: transparent;
+  color: var(--paper);
+  border: 1px solid var(--line-2);
+  border-radius: 0;
+  box-shadow: none;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  padding: 0.4rem 0.7rem;
+  filter: none;
+  text-transform: none;
+  letter-spacing: 0.04em;
+}
+.swagger-ui button:hover { filter: none; border-color: var(--amber); color: var(--amber); }
+.swagger-ui .btn.execute, .swagger-ui .btn.authorize {
+  background: var(--amber);
+  color: var(--ink);
+  border-color: var(--amber);
+}
+.swagger-ui .btn.execute:hover, .swagger-ui .btn.authorize:hover {
+  color: var(--ink);
+  filter: brightness(1.08);
+}
+.swagger-ui .authorization__btn, .swagger-ui .expand-operation,
+.swagger-ui button.expand-methods {
+  background: transparent;
+  border: 0;
+  padding: 0.15rem;
+  color: var(--muted);
+}
+.swagger-ui .copy-to-clipboard { background: var(--card); border: 1px solid var(--line); }
+.swagger-ui .dialog-ux { z-index: 60; }
+.swagger-ui .dialog-ux .modal-ux {
+  background: var(--card);
+  border: 1px solid var(--line-2);
+  border-radius: 0;
+  color: var(--paper);
+  box-shadow: 0 28px 70px rgba(0,0,0,.42);
+}
+.swagger-ui .dialog-ux .modal-ux-header { border-bottom: 1px solid var(--line); }
+.swagger-ui .dialog-ux .modal-ux-header h3,
+.swagger-ui .dialog-ux .modal-ux-content h4,
+.swagger-ui .auth-container { color: var(--paper); }
+.swagger-ui .auth-btn-wrapper .btn-done { background: var(--amber); color: var(--ink); border-color: var(--amber); }
+.swagger-ui svg { fill: var(--paper); }
+.swagger-ui .arrow { fill: var(--muted); }
+.swagger-ui a { color: var(--amber); }
 """
 
 
@@ -551,7 +695,8 @@ def _fill(template: str, **values: str) -> str:
     return html
 
 
-def _head(*, title: str, description: str, base: str) -> str:
+def _head(*, title: str, description: str, base: str, path: str = "/", extra: str = "") -> str:
+    url = f"{base}{path}"
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -559,17 +704,18 @@ def _head(*, title: str, description: str, base: str) -> str:
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{title}</title>
   <link rel="icon" href="{base}/icon.svg" type="image/svg+xml">
-  <link rel="canonical" href="{base}/">
+  <link rel="canonical" href="{url}">
   <meta name="description" content="{description}">
   <meta name="theme-color" content="#090807">
   <meta property="og:title" content="AfterImage">
   <meta property="og:description" content="{description}">
   <meta property="og:type" content="website">
-  <meta property="og:url" content="{base}">
+  <meta property="og:url" content="{url}">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT,WONK@9..144,400..600,0..100,0..1&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>{_CSS}</style>
+  {extra}
 </head>
 """
 
@@ -641,6 +787,40 @@ def paid_html(settings: Settings, payload: dict, *, status: int) -> str:
         TITLE=escape(title),
         LEAD=lead,
         STATE="ok" if status == 200 else "bad",
+    )
+
+
+def docs_html(settings: Settings, stats: dict | None = None) -> str:
+    base = escape(settings.public_url.rstrip("/"))
+    stats = stats or {}
+    indexed = int(stats.get("indexed") or 0)
+    title = escape("AfterImage — docs")
+    description = escape(
+        "HTTP, MCP, and x402 for AfterImage. Authorization Bearer ak_live_…. "
+        "HTTP 402 is unpaid: missing_key, unknown_key, unfunded_key, or insufficient_credits."
+    )
+    extra = (
+        '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css">\n'
+        f"  <style>{_SWAGGER_CSS}</style>"
+    )
+    return _fill(
+        _DOCS,
+        HEAD=_head(
+            title=title,
+            description=description,
+            base=base,
+            path="/docs",
+            extra=extra,
+        ),
+        BASE=base,
+        SEARCH=SEARCH_USDC,
+        HIT=HIT_USDC,
+        MISS=MISS_USDC,
+        INDEXED=f"{indexed:,}",
+        MAX_PAGES=f"{settings.max_snapshots:,}",
+        MAX_CHARS=f"{settings.max_text_chars:,}",
+        TTL_DAYS=str(settings.snapshot_ttl_days),
+        REMOVAL=escape(settings.removal_email),
     )
 
 
@@ -949,6 +1129,87 @@ _PAID = """{{HEAD}}
         });
       }
     } catch (e) {}
+  </script>
+</body>
+</html>
+"""
+
+_DOCS = """{{HEAD}}
+<body>
+  <div class="grain" aria-hidden="true"></div>
+  <div class="sprocket" aria-hidden="true"></div>
+  <div class="wrap">
+    <header class="nav">
+      <a class="brand" href="{{BASE}}/"><img src="{{BASE}}/icon.svg" alt="">AfterImage</a>
+      <nav class="nav-links">
+        <span class="pulse"><span data-indexed>{{INDEXED}}</span> in the library</span>
+        <a href="{{BASE}}/llms.txt">llms.txt</a>
+        <a href="{{BASE}}/docs" aria-current="page">Docs</a>
+        <a href="{{BASE}}/openapi.json">OpenAPI</a>
+        <a href="{{BASE}}/mcp/server-card">MCP</a>
+      </nav>
+    </header>
+    <main>
+      <section class="hero docs-hero">
+        <div>
+          <p class="kicker">HTTP, MCP, x402</p>
+          <h1 class="mark">AfterImage</h1>
+          <p class="lead">The HTTP surface.</p>
+          <p class="deck">Authorization: Bearer ak_live_…. HTTP 402 is unpaid: missing_key, unknown_key, unfunded_key, or insufficient_credits. Agents start at <a href="{{BASE}}/llms.txt">llms.txt</a>.</p>
+          <ul class="prices">
+            <li><strong>${{SEARCH}}</strong><span>search stored pages</span></li>
+            <li><strong>${{HIT}}</strong><span>reuse a fresh copy</span></li>
+            <li><strong>${{MISS}}</strong><span>live fetch</span></li>
+          </ul>
+          <div class="actions">
+            <a class="btn" href="{{BASE}}/openapi.json">OpenAPI JSON</a>
+            <a class="btn secondary" href="{{BASE}}/llms.txt">Agent brief (llms.txt)</a>
+          </div>
+        </div>
+      </section>
+      <section class="band spec">
+        <noscript class="noscript">JavaScript is off. The spec is GET {{BASE}}/openapi.json.</noscript>
+        <div id="swagger-ui"></div>
+      </section>
+    </main>
+    <footer class="site">
+      <p>Caps: {{MAX_PAGES}} pages, {{MAX_CHARS}} characters per page, evicted after {{TTL_DAYS}} days.
+      Live size: GET {{BASE}}/v1/stats (free). Removal: {{REMOVAL}}.
+      Agents start at <a href="{{BASE}}/llms.txt">{{BASE}}/llms.txt</a>.</p>
+      <div class="foot-row">
+        <span>AfterImage is a cache, not an archive.</span>
+        <span>
+          <a href="https://github.com/Lordkro/afterimage">GitHub</a>
+          · <a href="{{BASE}}/.well-known/x402">x402</a>
+          · <a href="{{BASE}}/health">health</a>
+        </span>
+      </div>
+    </footer>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+  <script>
+    window.ui = SwaggerUIBundle({
+      url: "/openapi.json",
+      dom_id: "#swagger-ui",
+      deepLinking: true,
+      persistAuthorization: true,
+      displayRequestDuration: true,
+      docExpansion: "list",
+      defaultModelsExpandDepth: 0,
+      filter: true,
+      tryItOutEnabled: true,
+      layout: "BaseLayout",
+      presets: [SwaggerUIBundle.presets.apis]
+    });
+    (async () => {
+      try {
+        const s = await fetch("/v1/stats").then((r) => r.json());
+        const n = Number(s.indexed || 0);
+        document.querySelectorAll("[data-indexed]").forEach((el) => {
+          el.textContent = n.toLocaleString("en-US");
+        });
+      } catch (e) {}
+    })();
   </script>
 </body>
 </html>

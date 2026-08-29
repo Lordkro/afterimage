@@ -24,7 +24,7 @@ from afterimage.discovery import (
 from afterimage.facilitator import HttpFacilitator
 from afterimage.fetch import HttpxFetcher
 from afterimage.keys import KeyStore, SqliteKeyStore
-from afterimage.landing import ICON_SVG, landing_html, paid_html, prefers_html
+from afterimage.landing import ICON_SVG, docs_html, landing_html, paid_html, prefers_html
 from afterimage.mcp import handle_rpc
 from afterimage.models import Clock, Fetcher, SnapshotStore
 from afterimage.packs import PACKS, get_pack
@@ -88,6 +88,8 @@ def create_app(
             "Shared copies of public web pages for AI agents. "
             "Send Authorization: Bearer ak_live_… or pay with x402. HTTP 402 if unpaid."
         ),
+        docs_url=None,
+        redoc_url=None,
     )
     app.state.fetcher = fetcher
     app.state.store = store
@@ -160,6 +162,10 @@ def create_app(
     @app.get("/", response_class=HTMLResponse, include_in_schema=False)
     async def home() -> str:
         return landing_html(app.state.settings, await _stats())
+
+    @app.get("/docs", response_class=HTMLResponse, include_in_schema=False)
+    async def docs() -> str:
+        return docs_html(app.state.settings, await _stats())
 
     @app.get("/icon.svg", include_in_schema=False)
     def icon() -> Response:

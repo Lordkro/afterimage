@@ -115,6 +115,37 @@ def test_landing_meter_is_oldest_copy_freshness() -> None:
     assert "pages of" not in text
 
 
+def test_docs_matches_the_landing_chrome() -> None:
+    client = TestClient(
+        create_app(
+            settings=Settings(public_url="https://afterimage.page"),
+            store=MemorySnapshotStore(),
+        )
+    )
+
+    response = client.get("/docs")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/html")
+    text = response.text
+    assert "AfterImage" in text
+    assert 'class="grain"' in text
+    assert 'class="sprocket"' in text
+    assert "/icon.svg" in text
+    assert "Fraunces" in text
+    assert "IBM Plex Mono" in text
+    assert "#090807" in text
+    assert "swagger-ui" in text
+    assert "/openapi.json" in text
+    assert "fastapi.tiangolo.com/img/favicon.png" not in text
+    assert "AfterImage - Swagger UI" not in text
+    assert 'aria-current="page"' in text
+    assert "missing_key" in text
+    assert "Caps:" in text
+    assert "{{" not in text
+    assert client.get("/redoc").status_code == 404
+
+
 def test_prefers_html_follows_accept_order() -> None:
     assert prefers_html("text/html,application/xhtml+xml")
     assert not prefers_html("*/*")
