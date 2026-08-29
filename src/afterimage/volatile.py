@@ -22,6 +22,18 @@ _TRAINING_HOSTS = frozenset(
         "datatracker.ietf.org",
         "rfc-editor.org",
         "httpwg.org",
+        "nodejs.org",
+        "typescriptlang.org",
+        "playwright.dev",
+        "owasp.org",
+        "sqlite.org",
+        "redis.io",
+        "json-schema.org",
+        "packaging.python.org",
+        "jsonrpc.org",
+        "swagger.io",
+        "cwe.mitre.org",
+        "json.schemastore.org",
     }
 )
 
@@ -38,7 +50,10 @@ def is_volatile_url(url: str) -> bool:
 
 
 def is_training_data_url(url: str) -> bool:
-    return _host(url) in _TRAINING_HOSTS
+    host = _host(url)
+    if host in _TRAINING_HOSTS:
+        return True
+    return host.endswith(".owasp.org")
 
 
 def drop_reason(url: str) -> str | None:

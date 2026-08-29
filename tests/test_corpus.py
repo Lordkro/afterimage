@@ -190,6 +190,24 @@ def test_already_stored_stdlib_is_dropped_from_search() -> None:
     assert body["hits"] == []
 
 
+def test_nodejs_docs_are_not_kept_in_the_corpus() -> None:
+    url = "https://nodejs.org/docs/latest/api/fs.html"
+    html = (
+        b"<!DOCTYPE html><html><head><title>File system</title></head>"
+        b"<body><main><p>fs.readFile reads a file from disk.</p></main></body></html>"
+    )
+    client = _client(
+        {url: FakePage(body=html)},
+        settings=Settings(max_snapshots=100, snapshot_ttl_s=10_000_000),
+    )
+    body = client.get("/v1/page", params={"url": url}).json()
+    assert body["stored"] is False
+    assert body["stored_reason"] == "training_data"
+    search = client.get("/v1/search", params={"q": "readFile"}).json()
+    assert search["indexed"] == 0
+    assert search["hits"] == []
+
+
 def test_error_pages_are_not_kept_in_the_corpus() -> None:
     url = "https://example.com/gone"
     client = _client(

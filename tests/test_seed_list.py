@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from afterimage.volatile import is_volatile_url
+from afterimage.volatile import is_training_data_url, is_volatile_url
 
 SEED = Path(__file__).resolve().parents[1] / "scripts" / "seed_urls.txt"
 _TRAINING_DATA_MARKERS = (
@@ -39,6 +39,7 @@ def test_seed_list_is_the_moving_class() -> None:
     for url in urls:
         assert url.startswith("https://")
         assert not is_volatile_url(url)
+        assert not is_training_data_url(url)
         assert url.rstrip("/") not in {u.rstrip("/") for u in _REDIRECT_DUPES}
         assert url not in _REDIRECT_DUPES
         for marker in _TRAINING_DATA_MARKERS:

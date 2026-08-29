@@ -183,7 +183,8 @@ Age is subtracted from max-age.
 stored_reason is why a live fetch was not kept:
 - noarchive / vary: the origin asked not to archive, or Vary: *
 - volatile: AfterImage will not index status pages (stale "up" is worse than a miss)
-- training_data: Python stdlib, PEPs, MDN, RFCs, git-scm — fetchable, not sold
+- training_data: stdlib, PEPs, MDN, RFCs, git-scm, Node, TypeScript, OWASP,
+  sqlite, redis, JSON Schema — fetchable, not sold
 - challenge: bot interstitial (Cloudflare and similar)
 - thin_extract / http_error: extract was a JS shell, title-only, fat HTML with
   almost no body, an order of magnitude shorter than the copy already stored,
