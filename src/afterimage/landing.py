@@ -515,6 +515,35 @@ def prefers_html(accept: str) -> bool:
     return json_at < 0 or html_at < json_at
 
 
+def _as_int(value: object) -> int | None:
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def freshness_pct(*, indexed: int, oldest_age_s: object, ttl_s: int) -> int:
+    """Remaining life of the oldest copy, 0–100. Empty library is 0, not 0/cap."""
+    age = _as_int(oldest_age_s)
+    if indexed <= 0 or age is None or ttl_s <= 0:
+        return 0
+    return min(100, max(0, round(100 * (1 - age / ttl_s))))
+
+
+def fresh_label(*, indexed: int, oldest_age_s: object, ttl_s: int, ttl_days: int) -> str:
+    age = _as_int(oldest_age_s)
+    if indexed <= 0 or age is None or ttl_s <= 0:
+        return "empty"
+    left = max(0.0, (ttl_s - age) / 86400)
+    if left >= 10 or abs(left - round(left)) < 0.05:
+        left_s = str(int(round(left)))
+    else:
+        left_s = f"{left:.1f}"
+    return f"oldest has {left_s} of {ttl_days} days left"
+
+
 def _fill(template: str, **values: str) -> str:
     html = template
     for key, value in values.items():
@@ -550,11 +579,15 @@ def landing_html(settings: Settings, stats: dict | None = None) -> str:
     stats = stats or {}
     indexed = int(stats.get("indexed") or 0)
     max_pages = settings.max_snapshots
-    fill = min(100, round((100 * indexed / max_pages) if max_pages else 0))
+    ttl_s = settings.snapshot_ttl_s
+    ttl_days = settings.snapshot_ttl_days
+    oldest_age_s = stats.get("oldest_age_s")
+    fill = freshness_pct(indexed=indexed, oldest_age_s=oldest_age_s, ttl_s=ttl_s)
     oldest = escape(str(stats.get("oldest_fetched_at") or "—"))
-    title = escape("AfterImage — shared copies of the public web for AI agents")
+    title = escape("AfterImage — fresh copies of the pages models get wrong")
     description = escape(
-        "If another agent already fetched a page, reuse that copy instead of scraping again. "
+        "Fresh copies of the pages models get wrong: model catalogs, provider prices, "
+        "dated protocol specs, changelogs, deprecations, and rate limits. "
         "Timestamp plus sha256. Humans buy credits; agents send a key."
     )
     return _fill(
@@ -567,8 +600,16 @@ def landing_html(settings: Settings, stats: dict | None = None) -> str:
         INDEXED=f"{indexed:,}",
         MAX_PAGES=f"{max_pages:,}",
         MAX_CHARS=f"{settings.max_text_chars:,}",
-        TTL_DAYS=str(settings.snapshot_ttl_days),
+        TTL_DAYS=str(ttl_days),
         FILL=str(fill),
+        FRESH_LABEL=escape(
+            fresh_label(
+                indexed=indexed,
+                oldest_age_s=oldest_age_s,
+                ttl_s=ttl_s,
+                ttl_days=ttl_days,
+            )
+        ),
         OLDEST=oldest,
         REMOVAL=escape(settings.removal_email),
     )
@@ -621,19 +662,19 @@ _LANDING = """{{HEAD}}
     <main>
       <section class="hero">
         <div>
-          <p class="kicker">Shared web copies for AI agents</p>
+          <p class="kicker">Pages models get wrong</p>
           <h1 class="mark">AfterImage</h1>
-          <p class="lead">A shared copy of the public web for AI agents.</p>
-          <p class="deck">If another agent already fetched a page, yours can reuse that copy — timestamp plus sha256 of the raw bytes — instead of scraping again. Search the copies. Humans buy credits; agents send an API key.</p>
+          <p class="lead">Fresh copies of the pages models get wrong.</p>
+          <p class="deck">Model catalogs, provider prices, dated protocol specs, changelogs, deprecations, rate limits, current package versions. If another agent already fetched a page, yours reuses that copy — timestamp plus sha256 of the raw bytes. Humans buy credits; agents send an API key.</p>
           <ul class="prices">
             <li><strong>${{SEARCH}}</strong><span>search stored pages</span></li>
             <li><strong>${{HIT}}</strong><span>reuse a fresh copy</span></li>
             <li><strong>${{MISS}}</strong><span>live fetch</span></li>
           </ul>
-          <p class="muted">Starter is <strong>$5</strong>. Builder is <strong>$20</strong>. HTTP 402 means the key is missing or empty.</p>
+          <p class="muted">Starter is <strong>$5</strong>. Builder is <strong>$20</strong>. HTTP 402 is unpaid: missing_key, unknown_key, unfunded_key, or insufficient_credits.</p>
           <div class="actions">
-            <button type="button" id="buy" data-pack="starter">Buy $5 credits</button>
-            <button type="button" class="secondary" id="buy20" data-pack="builder">Buy $20</button>
+            <button type="button" id="buy20" data-pack="builder">Buy $20 credits</button>
+            <button type="button" class="secondary" id="buy" data-pack="starter">Buy $5</button>
             <a class="btn secondary" href="{{BASE}}/llms.txt">Agent brief (llms.txt)</a>
           </div>
           <noscript class="noscript">JavaScript is off. POST {{BASE}}/v1/billing/checkout from a terminal, then open checkout_url.</noscript>
@@ -645,11 +686,11 @@ _LANDING = """{{HEAD}}
             <article class="print">
               <header><span>GET /v1/page</span><span class="tag">cache hit · ${{HIT}}</span></header>
               <dl class="kv">
-                <dt>url</dt><dd>https://fastapi.tiangolo.com/tutorial/background-tasks/</dd>
+                <dt>url</dt><dd>https://platform.openai.com/docs/pricing</dd>
                 <dt>cache</dt><dd>hit</dd>
                 <dt>hash</dt><dd>sha256:b7c19e0a9d44…c21f</dd>
                 <dt>fetched_at</dt><dd>2026-08-29T11:02:14Z</dd>
-                <dt>text</dt><dd>Background tasks run after returning a response. Use them for email, cleanup, and work the client does not wait on.</dd>
+                <dt>text</dt><dd>Input, cached input, and output are billed per 1M tokens. This is the live price table. Figures in training data lag.</dd>
               </dl>
             </article>
           </div>
@@ -683,17 +724,17 @@ _LANDING = """{{HEAD}}
           <p class="tiny">Same key for HTTP, MCP, and balance checks.</p>
         </div>
         <div class="packs">
-          <article class="pack featured">
+          <article class="pack">
             <span class="who">Starter</span>
             <strong>$5</strong>
             <p>About 1,000 searches, or 500 live fetches, or 2,500 cache hits.</p>
-            <button type="button" data-pack="starter">Buy $5 credits</button>
+            <button type="button" class="secondary" data-pack="starter">Buy $5 credits</button>
           </article>
-          <article class="pack">
+          <article class="pack featured">
             <span class="who">Builder</span>
             <strong>$20</strong>
             <p>About 4,000 searches, or 2,000 live fetches, or 10,000 cache hits.</p>
-            <button type="button" class="secondary" data-pack="builder">Buy $20</button>
+            <button type="button" data-pack="builder">Buy $20</button>
           </article>
         </div>
       </section>
@@ -703,8 +744,9 @@ _LANDING = """{{HEAD}}
           <div>
             <p class="kicker">Live library</p>
             <p class="big"><span data-indexed>{{INDEXED}}</span></p>
-            <p class="muted">pages of {{MAX_PAGES}}, evicted after {{TTL_DAYS}} days.</p>
+            <p class="muted">curated pages · cap {{MAX_PAGES}} · evicted after {{TTL_DAYS}} days.</p>
             <div class="meter" aria-hidden="true"><span id="fill" style="width:{{FILL}}%"></span></div>
+            <p class="tiny"><span id="fresh-label">{{FRESH_LABEL}}</span></p>
           </div>
           <dl class="meta-grid">
             <div><dt>Per page</dt><dd>{{MAX_CHARS}} characters</dd></div>
@@ -734,14 +776,14 @@ _LANDING = """{{HEAD}}
           <pre class="on" data-panel="checkout">curl -sS -X POST {{BASE}}/v1/billing/checkout \\
   -H 'content-type: application/json' \\
   -d '{"pack":"starter"}'</pre>
-          <pre data-panel="search">curl -sS '{{BASE}}/v1/search?q=fastapi+background+tasks' \\
+          <pre data-panel="search">curl -sS '{{BASE}}/v1/search?q=openai+pricing' \\
   -H "Authorization: Bearer ak_live_…"</pre>
-          <pre data-panel="page">curl -sS '{{BASE}}/v1/page?url=https://example.com/&amp;max_age_s=900' \\
+          <pre data-panel="page">curl -sS '{{BASE}}/v1/page?url=https://platform.openai.com/docs/pricing&amp;max_age_s=900' \\
   -H "Authorization: Bearer ak_live_…"</pre>
           <pre data-panel="mcp">curl -sS -X POST {{BASE}}/mcp \\
   -H "Authorization: Bearer ak_live_…" \\
   -H 'content-type: application/json' \\
-  -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"search_pages","arguments":{"q":"fastapi"}}}'</pre>
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"search_pages","arguments":{"q":"openai pricing"}}}'</pre>
         </div>
       </section>
     </main>
@@ -829,12 +871,29 @@ _LANDING = """{{HEAD}}
       try {
         const s = await fetch("/v1/stats").then((r) => r.json());
         const n = Number(s.indexed || 0);
-        const max = Number(s.max_snapshots || 0);
         document.querySelectorAll("[data-indexed]").forEach((el) => {
           el.textContent = n.toLocaleString("en-US");
         });
+        const ttl = Number(s.snapshot_ttl_s || 0);
+        const age = s.oldest_age_s;
         const fill = document.getElementById("fill");
-        if (fill && max) fill.style.width = Math.min(100, (100 * n) / max) + "%";
+        if (fill && ttl) {
+          if (age == null || n === 0) fill.style.width = "0%";
+          else fill.style.width = Math.min(100, Math.max(0, 100 * (1 - Number(age) / ttl))) + "%";
+        }
+        const fresh = document.getElementById("fresh-label");
+        if (fresh && ttl) {
+          if (age == null || n === 0) {
+            fresh.textContent = "empty";
+          } else {
+            const days = Math.max(0, (ttl - Number(age)) / 86400);
+            const ttlDays = Math.max(1, Math.round(ttl / 86400));
+            const left = (days >= 10 || Math.abs(days - Math.round(days)) < 0.05)
+              ? String(Math.round(days))
+              : days.toFixed(1);
+            fresh.textContent = "oldest has " + left + " of " + ttlDays + " days left";
+          }
+        }
         const oldest = document.getElementById("oldest");
         if (oldest && s.oldest_fetched_at) oldest.textContent = s.oldest_fetched_at;
       } catch (e) {}

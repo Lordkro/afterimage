@@ -1,9 +1,13 @@
+import asyncio
+from datetime import timedelta
+
 from fastapi.testclient import TestClient
 
 from afterimage.app import create_app
-from afterimage.landing import prefers_html
+from afterimage.landing import fresh_label, freshness_pct, prefers_html
+from afterimage.models import Snapshot
 from afterimage.settings import Settings
-from tests.fakes import MemorySnapshotStore
+from tests.fakes import FakeClock, MemorySnapshotStore
 
 
 def test_icon_svg_is_served() -> None:
@@ -48,6 +52,67 @@ def test_root_is_a_human_landing_page() -> None:
     assert "Buy $5 credits" in text
     assert "/v1/stats" in text
     assert "in the library" in text
+    assert "Fresh copies of the pages models get wrong." in text
+    assert "shared copy of the public web" not in text
+    assert "https://platform.openai.com/docs/pricing" in text
+    assert "fastapi.tiangolo.com" not in text
+    assert "missing_key" in text
+    assert "unknown_key" in text
+    assert "unfunded_key" in text
+    assert "insufficient_credits" in text
+    assert "missing or empty" not in text
+    assert 'id="fresh-label"' in text
+    featured = text[text.find('class="pack featured"') :]
+    featured = featured[: featured.find("</article>") + 10]
+    assert "Builder" in featured
+    assert "Starter" not in featured
+
+
+def test_freshness_pct_is_age_against_ttl_not_fullness() -> None:
+    ttl = 10 * 24 * 60 * 60
+    assert freshness_pct(indexed=0, oldest_age_s=None, ttl_s=ttl) == 0
+    assert freshness_pct(indexed=157, oldest_age_s=0, ttl_s=ttl) == 100
+    assert freshness_pct(indexed=157, oldest_age_s=ttl // 2, ttl_s=ttl) == 50
+    assert freshness_pct(indexed=157, oldest_age_s=ttl, ttl_s=ttl) == 0
+    assert fresh_label(indexed=0, oldest_age_s=None, ttl_s=ttl, ttl_days=10) == "empty"
+    assert (
+        fresh_label(indexed=157, oldest_age_s=ttl // 2, ttl_s=ttl, ttl_days=10)
+        == "oldest has 5 of 10 days left"
+    )
+
+
+def test_landing_meter_is_oldest_copy_freshness() -> None:
+    store = MemorySnapshotStore()
+    clock = FakeClock()
+    fetched = clock.now() - timedelta(days=5)
+    asyncio.run(
+        store.put(
+            Snapshot(
+                url="https://platform.openai.com/docs/pricing",
+                final_url="https://platform.openai.com/docs/pricing",
+                status=200,
+                title="Pricing",
+                text="Input, cached input, and output are billed per 1M tokens.",
+                content_hash="sha256:" + "a" * 64,
+                fetched_at=fetched,
+                content_type="text/html",
+            )
+        )
+    )
+    client = TestClient(
+        create_app(
+            settings=Settings(public_url="https://afterimage.page"),
+            store=store,
+            clock=clock,
+        )
+    )
+
+    text = client.get("/").text
+
+    assert 'style="width:50%"' in text
+    assert "oldest has 5 of 10 days left" in text
+    assert 'style="width:0%"' not in text
+    assert "pages of" not in text
 
 
 def test_prefers_html_follows_accept_order() -> None:
