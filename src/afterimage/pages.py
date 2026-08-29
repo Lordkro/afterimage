@@ -69,7 +69,7 @@ async def fresh_snapshot(
     age_s = int((clock.now() - existing.fetched_at).total_seconds())
     if ttl_s > 0 and age_s > ttl_s:
         return None
-    if existing.origin_max_age_s is not None and age_s > existing.origin_max_age_s:
+    if existing.origin_max_age_s is not None and age_s >= existing.origin_max_age_s:
         return None
     if age_s <= max_age_s:
         return existing
@@ -113,7 +113,7 @@ async def snapshot_page(
     title, raw_text = extract_readable(fetched.body, fetched.content_type)
     text = truncate_text(raw_text, settings.max_text_chars)
     truncated = len(raw_text) > len(text)
-    policy = origin_cache_policy(headers=fetched.headers)
+    policy = origin_cache_policy(headers=fetched.headers, now=now)
     noarchive = forbids_archive(
         headers=fetched.headers,
         body=fetched.body,

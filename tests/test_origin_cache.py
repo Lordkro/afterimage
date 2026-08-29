@@ -31,6 +31,41 @@ def test_max_age_is_parsed() -> None:
     assert policy.reason is None
 
 
+def test_no_cache_is_stored_but_never_fresh() -> None:
+    policy = origin_cache_policy(headers={"cache-control": "no-cache, max-age=600"})
+    assert policy.persist is True
+    assert policy.max_age_s == 0
+
+
+def test_must_revalidate_without_lifetime_is_never_fresh() -> None:
+    policy = origin_cache_policy(headers={"cache-control": "must-revalidate"})
+    assert policy.persist is True
+    assert policy.max_age_s == 0
+
+
+def test_age_is_subtracted_from_lifetime() -> None:
+    policy = origin_cache_policy(headers={"cache-control": "max-age=600", "age": "550"})
+    assert policy.persist is True
+    assert policy.max_age_s == 50
+
+
+def test_expires_is_used_when_cache_control_is_absent() -> None:
+    policy = origin_cache_policy(
+        headers={
+            "date": "Sat, 29 Aug 2026 12:00:00 GMT",
+            "expires": "Sat, 29 Aug 2026 12:01:00 GMT",
+        }
+    )
+    assert policy.persist is True
+    assert policy.max_age_s == 60
+
+
+def test_vary_star_is_not_persisted() -> None:
+    policy = origin_cache_policy(headers={"vary": "*"})
+    assert policy.persist is False
+    assert policy.reason == "vary"
+
+
 def test_no_store_page_is_returned_with_reason() -> None:
     store = MemorySnapshotStore()
     client = TestClient(
@@ -84,3 +119,82 @@ def test_origin_max_age_caps_reuse() -> None:
         params={"url": "https://example.com/short", "max_age_s": 900},
     ).json()
     assert again["cache"] == "miss"
+
+
+def test_age_shortens_stored_freshness() -> None:
+    clock = FakeClock()
+    client = TestClient(
+        create_app(
+            fetcher=FakeFetcher(
+                {
+                    "https://example.com/cdn": FakePage(
+                        body=PRICING_HTML,
+                        headers={"cache-control": "max-age=600", "age": "550"},
+                    )
+                }
+            ),
+            store=MemorySnapshotStore(),
+            clock=clock,
+        )
+    )
+    miss = client.get(
+        "/v1/page",
+        params={"url": "https://example.com/cdn", "max_age_s": 900},
+    ).json()
+    assert miss["stored"] is True
+    assert miss["origin_max_age_s"] == 50
+    clock.advance(51)
+    again = client.get(
+        "/v1/page",
+        params={"url": "https://example.com/cdn", "max_age_s": 900},
+    ).json()
+    assert again["cache"] == "miss"
+
+
+def test_no_cache_never_becomes_a_hit() -> None:
+    client = TestClient(
+        create_app(
+            fetcher=FakeFetcher(
+                {
+                    "https://example.com/reval": FakePage(
+                        body=PRICING_HTML,
+                        headers={"cache-control": "no-cache"},
+                    )
+                }
+            ),
+            store=MemorySnapshotStore(),
+        )
+    )
+    first = client.get(
+        "/v1/page",
+        params={"url": "https://example.com/reval", "max_age_s": 900},
+    ).json()
+    assert first["stored"] is True
+    assert first["origin_max_age_s"] == 0
+    second = client.get(
+        "/v1/page",
+        params={"url": "https://example.com/reval", "max_age_s": 900},
+    ).json()
+    assert second["cache"] == "miss"
+
+
+def test_vary_star_is_returned_with_reason() -> None:
+    body = (
+        TestClient(
+            create_app(
+                fetcher=FakeFetcher(
+                    {
+                        "https://example.com/vary": FakePage(
+                            body=PRICING_HTML,
+                            headers={"vary": "*"},
+                        )
+                    }
+                ),
+                store=MemorySnapshotStore(),
+            )
+        )
+        .get("/v1/page", params={"url": "https://example.com/vary"})
+        .json()
+    )
+    assert body["stored"] is False
+    assert body["stored_reason"] == "vary"
