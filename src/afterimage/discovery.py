@@ -12,7 +12,7 @@ from afterimage.pricing import (
     SEARCH_USDC,
 )
 from afterimage.x402 import bazaar_extension
-from afterimage.settings import Settings
+from afterimage.settings import USDC_EIP712_NAME, USDC_EIP712_VERSION, Settings
 
 SERVER_CARD_SCHEMA = (
     "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json"
@@ -151,7 +151,7 @@ def x402_well_known(settings: Settings) -> dict:
     base = settings.public_url.rstrip("/")
     resource_url = f"{base}/v1/page"
     pay_to = settings.pay_to.strip()
-    extra = {"name": "USDC", "version": "2"}
+    extra = {"name": USDC_EIP712_NAME, "version": USDC_EIP712_VERSION}
 
     def accept(amount: str) -> dict:
         return {

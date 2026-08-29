@@ -9,7 +9,12 @@ from fastapi.responses import JSONResponse
 
 from afterimage.keys import KeyStore
 from afterimage.mcp import GET_PAGE_SCHEMA, SEARCH_PAGES_SCHEMA
-from afterimage.settings import Settings, paid_mode
+from afterimage.settings import (
+    USDC_EIP712_NAME,
+    USDC_EIP712_VERSION,
+    Settings,
+    paid_mode,
+)
 
 
 class Facilitator(Protocol):
@@ -242,7 +247,10 @@ def payment_required(
                 "asset": settings.usdc_asset,
                 "payTo": settings.pay_to,
                 "maxTimeoutSeconds": 60,
-                "extra": {"name": "USDC", "version": "2"},
+                "extra": {
+                    "name": USDC_EIP712_NAME,
+                    "version": USDC_EIP712_VERSION,
+                },
             }
         ],
         "extensions": bazaar_extension(resource_path, tool_name=tool_name),

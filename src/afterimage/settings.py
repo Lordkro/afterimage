@@ -1,7 +1,9 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# Base mainnet USDC
+# Base mainnet USDC. extra.name must match the EIP-712 domain, not the ticker.
 BASE_USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+USDC_EIP712_NAME = "USD Coin"
+USDC_EIP712_VERSION = "2"
 
 
 class Settings(BaseSettings):

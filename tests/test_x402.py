@@ -68,6 +68,8 @@ def test_paid_mode_challenges_unpaid_fetch_at_miss_price() -> None:
     amounts = {item["amount"] for item in required["accepts"]}
     assert MISS_ATOMIC in amounts
     assert required["resource"]["url"].endswith("/v1/page")
+    assert required["accepts"][0]["extra"]["name"] == "USD Coin"
+    assert required["accepts"][0]["extra"]["version"] == "2"
     bazaar = required["extensions"]["bazaar"]
     assert bazaar["info"]["input"]["type"] == "http"
     assert bazaar["info"]["input"]["method"] == "GET"
