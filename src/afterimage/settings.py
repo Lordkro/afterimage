@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     pay_to: str = ""
     network: str = "eip155:8453"
     usdc_asset: str = BASE_USDC
-    facilitator_url: str = "https://x402.org/facilitator"
+    facilitator_url: str = "https://facilitator.payai.network"
     stripe_secret_key: str = ""
     stripe_webhook_secret: str = ""
     sqlite_path: str = "data/afterimage.db"

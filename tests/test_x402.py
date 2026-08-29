@@ -3,7 +3,10 @@ import json
 
 from fastapi.testclient import TestClient
 
+import httpx
+
 from afterimage.app import create_app
+from afterimage.facilitator import facilitator_error
 from afterimage.pricing import HIT_ATOMIC, MISS_ATOMIC, SEARCH_ATOMIC
 from afterimage.settings import Settings
 from tests.fakes import FakeClock, FakeFetcher, FakePage, MemorySnapshotStore
@@ -144,3 +147,12 @@ def test_paid_mode_challenges_search_at_search_price() -> None:
     assert amounts == {SEARCH_ATOMIC}
     assert required["resource"]["url"].endswith("/v1/search")
     assert required["extensions"]["bazaar"]["info"]["input"]["queryParams"]["q"]
+
+
+def test_facilitator_error_includes_response_body() -> None:
+    response = httpx.Response(
+        500,
+        text='{"error":"No facilitator registered for scheme: exact and network: eip155:8453"}',
+    )
+    assert "eip155:8453" in facilitator_error("verify", response)
+    assert "500" in facilitator_error("verify", response)
