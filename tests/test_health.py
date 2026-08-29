@@ -1,6 +1,11 @@
+import asyncio
+from datetime import UTC, datetime
+
 from fastapi.testclient import TestClient
 
 from afterimage.app import create_app
+from afterimage.models import Snapshot
+from afterimage.settings import Settings
 from tests.fakes import FakeClock, FakeFetcher, FakePage, MemorySnapshotStore
 from tests.test_page import PRICING_HTML
 
@@ -44,3 +49,31 @@ def test_stats_is_free_and_reports_live_corpus_size() -> None:
     assert health.json()["indexed"] == 1
     assert health.headers.get("cache-control") == "no-store"
     assert stats.headers.get("cache-control") == "no-store"
+
+
+def test_stats_drops_stdlib_from_indexed() -> None:
+    store = MemorySnapshotStore()
+    now = datetime(2026, 8, 27, 18, 41, 2, tzinfo=UTC)
+    asyncio.run(
+        store.put(
+            Snapshot(
+                url="https://docs.python.org/3/library/json.html",
+                final_url="https://docs.python.org/3/library/json.html",
+                status=200,
+                title="json",
+                text="json.dumps encodes objects.",
+                content_hash="sha256:" + "c" * 64,
+                fetched_at=now,
+                content_type="text/html",
+            )
+        )
+    )
+    client = TestClient(
+        create_app(
+            fetcher=FakeFetcher({}),
+            store=store,
+            clock=FakeClock(),
+            settings=Settings(max_snapshots=100, snapshot_ttl_s=10_000_000),
+        )
+    )
+    assert client.get("/v1/stats").json()["indexed"] == 0

@@ -28,7 +28,14 @@ from afterimage.keys import KeyStore, SqliteKeyStore
 from afterimage.mcp import handle_rpc
 from afterimage.models import Clock, Fetcher, SnapshotStore
 from afterimage.packs import PACKS, get_pack
-from afterimage.pages import DEFAULT_MAX_AGE_S, PageResponse, fresh_snapshot, iso_z, snapshot_page
+from afterimage.pages import (
+    DEFAULT_MAX_AGE_S,
+    PageResponse,
+    fresh_snapshot,
+    iso_z,
+    prune_corpus,
+    snapshot_page,
+)
 from afterimage.pricing import SEARCH_ATOMIC, price_atomic
 from afterimage.search import (
     DEFAULT_SEARCH_LIMIT,
@@ -125,6 +132,7 @@ def create_app(
         oldest_fetched_at = None
         oldest_age_s = None
         if app.state.store is not None:
+            await prune_corpus(app.state.store, app.state.settings, app.state.clock)
             indexed = await app.state.store.count()
             oldest = await app.state.store.oldest_fetched_at()
             if oldest is not None:

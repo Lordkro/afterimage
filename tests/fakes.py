@@ -3,8 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
+from afterimage.extract import fts_text
 from afterimage.models import FetchResult, Snapshot
-from afterimage.volatile import is_volatile_url
+from afterimage.volatile import drop_reason
 
 
 @dataclass
@@ -58,7 +59,8 @@ class MemorySnapshotStore:
     async def search(self, tokens: list[str], *, limit: int) -> list[Snapshot]:
         hits: list[Snapshot] = []
         for snapshot in self._by_url.values():
-            haystack = f"{snapshot.url}\n{snapshot.title}\n{snapshot.text}".lower()
+            indexed = fts_text(snapshot.text, snapshot.content_type)
+            haystack = f"{snapshot.url}\n{snapshot.title}\n{indexed}".lower()
             if all(token in haystack for token in tokens):
                 hits.append(snapshot)
             if len(hits) >= limit:
@@ -66,12 +68,12 @@ class MemorySnapshotStore:
         return hits
 
     async def prune(self, *, now: datetime, ttl_s: int, max_snapshots: int) -> None:
-        volatile = [
+        dropped = [
             url
             for url, snapshot in self._by_url.items()
-            if is_volatile_url(url) or is_volatile_url(snapshot.final_url)
+            if drop_reason(url) or drop_reason(snapshot.final_url)
         ]
-        for url in volatile:
+        for url in dropped:
             del self._by_url[url]
         if ttl_s > 0:
             expired = [

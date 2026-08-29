@@ -18,7 +18,7 @@ from afterimage.pricing import price_usdc
 from afterimage.robots_archive import forbids_archive
 from afterimage.settings import Settings
 from afterimage.urls import require_public_http_url
-from afterimage.volatile import is_volatile_url
+from afterimage.volatile import drop_reason
 
 DEFAULT_MAX_AGE_S = 900
 
@@ -102,7 +102,7 @@ async def snapshot_page(
     await prune_corpus(store, settings, clock)
     now = clock.now()
     previous = None
-    if not is_volatile_url(url):
+    if drop_reason(url) is None:
         previous = await store.get(url)
         existing = await fresh_snapshot(
             url,
@@ -134,8 +134,8 @@ async def snapshot_page(
         content_type=fetched.content_type,
     )
     stored_reason = None
-    if is_volatile_url(url) or is_volatile_url(fetched.final_url):
-        stored_reason = "volatile"
+    if drop_reason(url) or drop_reason(fetched.final_url):
+        stored_reason = drop_reason(url) or drop_reason(fetched.final_url)
     elif noarchive:
         stored_reason = "noarchive"
     elif not policy.persist:
@@ -166,7 +166,7 @@ async def snapshot_page(
     if keep:
         await store.put(snapshot)
         await prune_corpus(store, settings, clock)
-    elif stored_reason in {"noarchive", "vary", "volatile"}:
+    elif stored_reason in {"noarchive", "vary", "volatile", "training_data"}:
         await store.delete(url)
     return _view(
         snapshot,

@@ -141,6 +141,55 @@ def test_already_stored_status_pages_are_dropped_from_search() -> None:
     assert body["hits"] == []
 
 
+def test_stdlib_docs_are_not_kept_in_the_corpus() -> None:
+    url = "https://docs.python.org/3/library/json.html"
+    html = (
+        b"<!DOCTYPE html><html><head><title>json encoder</title></head>"
+        b"<body><main><p>json.dumps encodes a Python object.</p></main></body></html>"
+    )
+    client = _client(
+        {url: FakePage(body=html)},
+        settings=Settings(max_snapshots=100, snapshot_ttl_s=10_000_000),
+    )
+    body = client.get("/v1/page", params={"url": url}).json()
+    assert body["stored"] is False
+    assert body["stored_reason"] == "training_data"
+    assert "json.dumps" in body["text"]
+    search = client.get("/v1/search", params={"q": "dumps"}).json()
+    assert search["indexed"] == 0
+    assert search["hits"] == []
+
+
+def test_already_stored_stdlib_is_dropped_from_search() -> None:
+    store = MemorySnapshotStore()
+    now = datetime(2026, 8, 27, 18, 41, 2, tzinfo=UTC)
+    asyncio.run(
+        store.put(
+            Snapshot(
+                url="https://docs.python.org/3/library/functools.html",
+                final_url="https://docs.python.org/3/library/functools.html",
+                status=200,
+                title="functools",
+                text="functools.lru_cache memoizes a function.",
+                content_hash="sha256:" + "b" * 64,
+                fetched_at=now,
+                content_type="text/html",
+            )
+        )
+    )
+    client = TestClient(
+        create_app(
+            fetcher=FakeFetcher({}),
+            store=store,
+            clock=FakeClock(),
+            settings=Settings(max_snapshots=100, snapshot_ttl_s=10_000_000),
+        )
+    )
+    body = client.get("/v1/search", params={"q": "lru_cache"}).json()
+    assert body["indexed"] == 0
+    assert body["hits"] == []
+
+
 def test_error_pages_are_not_kept_in_the_corpus() -> None:
     url = "https://example.com/gone"
     client = _client(

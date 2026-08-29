@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 from html.parser import HTMLParser
 
@@ -140,6 +141,8 @@ class _ReadableParser(HTMLParser):
 
 def extract_readable(body: bytes, content_type: str = "text/html") -> tuple[str, str]:
     """Return (title, readable text). Never returns raw markup."""
+    if _is_json(content_type):
+        return _extract_json(body)
     charset = _charset(content_type)
     html = body.decode(charset, errors="replace")
     title, text = _parse(html, skip_chrome=True)
@@ -173,6 +176,50 @@ def worse_extract(previous: str, new: str) -> bool:
     if len(previous) < 80:
         return False
     return len(new) * 10 < len(previous)
+
+
+def fts_text(text: str, content_type: str = "") -> str:
+    """Text that should go in the search index. Omits package README fields."""
+    if not _is_json(content_type):
+        return text
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        return ""
+    return json.dumps(_omit_descriptions(data), ensure_ascii=False)
+
+
+def _is_json(content_type: str) -> bool:
+    lowered = content_type.lower()
+    return "json" in lowered and "html" not in lowered
+
+
+def _extract_json(body: bytes) -> tuple[str, str]:
+    raw = body.decode("utf-8", errors="replace")
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return "", raw.strip()
+    title = ""
+    if isinstance(data, dict):
+        info = data["info"] if isinstance(data.get("info"), dict) else data
+        name = str(info.get("name") or "").strip()
+        version = str(info.get("version") or "").strip()
+        title = " ".join(part for part in (name, version) if part)
+    return title, json.dumps(data, ensure_ascii=False)
+
+
+def _omit_descriptions(data: object) -> object:
+    if isinstance(data, dict):
+        skipped = {"description", "description_content_type"}
+        return {
+            key: _omit_descriptions(value)
+            for key, value in data.items()
+            if key not in skipped
+        }
+    if isinstance(data, list):
+        return [_omit_descriptions(item) for item in data]
+    return data
 
 
 def _parse(html: str, *, skip_chrome: bool) -> tuple[str, str]:

@@ -5,8 +5,9 @@ import sqlite3
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+from afterimage.extract import fts_text
 from afterimage.models import Snapshot
-from afterimage.volatile import is_volatile_url
+from afterimage.volatile import drop_reason
 
 
 class SqliteSnapshotStore:
@@ -56,15 +57,21 @@ class SqliteSnapshotStore:
     def _backfill_fts(self) -> None:
         count = self._conn.execute("SELECT COUNT(*) FROM snapshots_fts").fetchone()
         if count and count[0]:
+            self._reindex_fts()
             return
-        rows = self._conn.execute("SELECT url, title, text FROM snapshots").fetchall()
-        for url, title, text in rows:
+        self._reindex_fts()
+
+    def _reindex_fts(self) -> None:
+        self._conn.execute("DELETE FROM snapshots_fts")
+        rows = self._conn.execute(
+            "SELECT url, title, text, content_type FROM snapshots"
+        ).fetchall()
+        for url, title, text, content_type in rows:
             self._conn.execute(
                 "INSERT INTO snapshots_fts (url, title, text) VALUES (?, ?, ?)",
-                (url, title, text),
+                (url, title, fts_text(text, content_type or "")),
             )
-        if rows:
-            self._conn.commit()
+        self._conn.commit()
 
     async def get(self, url: str) -> Snapshot | None:
         async with self._lock:
@@ -119,7 +126,11 @@ class SqliteSnapshotStore:
             )
             self._conn.execute(
                 "INSERT INTO snapshots_fts (url, title, text) VALUES (?, ?, ?)",
-                (snapshot.url, snapshot.title, snapshot.text),
+                (
+                    snapshot.url,
+                    snapshot.title,
+                    fts_text(snapshot.text, snapshot.content_type),
+                ),
             )
             self._conn.commit()
 
@@ -162,12 +173,12 @@ class SqliteSnapshotStore:
 
     async def prune(self, *, now: datetime, ttl_s: int, max_snapshots: int) -> None:
         async with self._lock:
-            volatile = [
+            dropped = [
                 row[0]
                 for row in self._conn.execute("SELECT url, final_url FROM snapshots")
-                if is_volatile_url(row[0]) or is_volatile_url(row[1])
+                if drop_reason(row[0]) or drop_reason(row[1])
             ]
-            self._delete_urls(volatile)
+            self._delete_urls(dropped)
             if ttl_s > 0:
                 cutoff = (now.astimezone(UTC) - timedelta(seconds=ttl_s)).isoformat()
                 urls = [

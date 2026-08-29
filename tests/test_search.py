@@ -1,3 +1,5 @@
+import json
+
 from fastapi.testclient import TestClient
 
 from afterimage.app import create_app
@@ -36,6 +38,35 @@ def _client(
         )
     )
     return client, fetcher
+
+
+def test_package_readme_is_stored_but_not_searched() -> None:
+    payload = {
+        "info": {
+            "name": "httpx",
+            "version": "0.28.1",
+            "summary": "A next generation HTTP client.",
+            "description": "UniqueTokenRetriesInReadme for connection retries.",
+        }
+    }
+    url = "https://pypi.org/pypi/httpx/json"
+    client, _fetcher = _client(
+        {
+            url: FakePage(
+                body=json.dumps(payload).encode(),
+                content_type="application/json",
+            )
+        }
+    )
+    page = client.get("/v1/page", params={"url": url}).json()
+    assert page["stored"] is True
+    assert "UniqueTokenRetriesInReadme" in page["text"]
+    assert "0.28.1" in page["text"]
+    readme = client.get("/v1/search", params={"q": "UniqueTokenRetriesInReadme"}).json()
+    assert readme["indexed"] == 1
+    assert readme["hits"] == []
+    named = client.get("/v1/search", params={"q": "httpx"}).json()
+    assert named["hits"][0]["url"] == url
 
 
 def test_search_finds_a_previously_fetched_page_without_refetching() -> None:

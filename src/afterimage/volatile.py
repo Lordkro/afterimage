@@ -12,10 +12,38 @@ _VOLATILE_HOSTS = frozenset(
         "status.github.com",
     }
 )
+# In every model's training data. Fetch live if asked; do not sell a copy.
+_TRAINING_HOSTS = frozenset(
+    {
+        "docs.python.org",
+        "peps.python.org",
+        "git-scm.com",
+        "developer.mozilla.org",
+        "datatracker.ietf.org",
+        "rfc-editor.org",
+        "httpwg.org",
+    }
+)
 
 
-def is_volatile_url(url: str) -> bool:
+def _host(url: str) -> str:
     host = (urlparse(url).hostname or "").lower().rstrip(".")
     if host.startswith("www."):
         host = host[4:]
-    return host in _VOLATILE_HOSTS
+    return host
+
+
+def is_volatile_url(url: str) -> bool:
+    return _host(url) in _VOLATILE_HOSTS
+
+
+def is_training_data_url(url: str) -> bool:
+    return _host(url) in _TRAINING_HOSTS
+
+
+def drop_reason(url: str) -> str | None:
+    if is_volatile_url(url):
+        return "volatile"
+    if is_training_data_url(url):
+        return "training_data"
+    return None
