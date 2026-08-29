@@ -141,6 +141,8 @@ async def search_corpus(
         )
         for score, snapshot, aliases in unique[:limit]
     ]
+    if indexed > 0 and not hits:
+        await store.record_unmatched(q, indexed=indexed, at=now)
     return SearchResponse(
         q=q,
         indexed=indexed,

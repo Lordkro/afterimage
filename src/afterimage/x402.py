@@ -219,16 +219,31 @@ def bazaar_extension(
     }
 
 
+PAGE_DESCRIPTION = (
+    "Fetch any public URL. If AfterImage already has a copy, reuse it "
+    "(timestamp + sha256). Live fetch if not."
+)
+SEARCH_DESCRIPTION = (
+    "Search copies AfterImage already fetched. Does not hit the live web. "
+    "Empty hits: GET /v1/page with the URL."
+)
+MCP_DESCRIPTION = (
+    "MCP tools: search_pages (corpus only) and get_page (any public URL)."
+)
+SERVICE_TAGS = ["web", "cache", "search", "snapshot", "x402"]
+
+
 def payment_required(
     *,
     settings: Settings,
     resource_url: str,
     amount: str,
-    description: str = "Reusable web snapshot with provenance",
+    description: str = PAGE_DESCRIPTION,
     error: str = "PAYMENT-SIGNATURE header is required",
     resource_path: str = "/v1/page",
     tool_name: str | None = None,
 ) -> dict[str, Any]:
+    public = settings.public_url.rstrip("/")
     return {
         "x402Version": 2,
         "error": error,
@@ -237,7 +252,8 @@ def payment_required(
             "description": description,
             "mimeType": "application/json",
             "serviceName": "AfterImage",
-            "tags": ["web", "cache", "search", "snapshot"],
+            "tags": list(SERVICE_TAGS),
+            "iconUrl": f"{public}/icon.svg",
         },
         "accepts": [
             {
@@ -332,7 +348,7 @@ async def require_payment(
     facilitator: Facilitator | None,
     amount: str,
     resource_path: str,
-    description: str = "Reusable web snapshot with provenance",
+    description: str = PAGE_DESCRIPTION,
     keys: KeyStore | None = None,
     tool_name: str | None = None,
 ) -> JSONResponse | dict | None:

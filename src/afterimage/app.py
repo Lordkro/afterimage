@@ -21,7 +21,7 @@ from afterimage.discovery import (
     mcp_server_card,
     x402_well_known,
 )
-from afterimage.landing import landing_html
+from afterimage.landing import ICON_SVG, landing_html
 from afterimage.facilitator import HttpFacilitator
 from afterimage.fetch import HttpxFetcher
 from afterimage.keys import KeyStore, SqliteKeyStore
@@ -46,7 +46,15 @@ from afterimage.search import (
 from afterimage.settings import Settings, paid_mode
 from afterimage.store import SqliteSnapshotStore
 from afterimage.rate_limit import SlidingWindow
-from afterimage.x402 import Facilitator, billed_headers, require_payment, unpaid_response
+from afterimage.x402 import (
+    MCP_DESCRIPTION,
+    PAGE_DESCRIPTION,
+    SEARCH_DESCRIPTION,
+    Facilitator,
+    billed_headers,
+    require_payment,
+    unpaid_response,
+)
 
 
 def create_app(
@@ -153,6 +161,10 @@ def create_app(
     def home() -> str:
         return landing_html(app.state.settings)
 
+    @app.get("/icon.svg", include_in_schema=False)
+    def icon() -> Response:
+        return Response(ICON_SVG, media_type="image/svg+xml")
+
     @app.get("/health")
     async def health() -> dict:
         stats = await _stats()
@@ -161,6 +173,12 @@ def create_app(
     @app.get("/v1/stats")
     async def stats() -> dict:
         return await _stats()
+
+    @app.get("/v1/gaps", include_in_schema=False)
+    async def gaps() -> dict:
+        if app.state.store is None:
+            return {"queries": []}
+        return {"queries": await app.state.store.unmatched_queries()}
 
     @app.get("/llms.txt", response_class=PlainTextResponse, include_in_schema=False)
     def get_llms_txt() -> str:
@@ -259,6 +277,7 @@ def create_app(
             facilitator=app.state.facilitator,
             amount=price_atomic(cache_hit=cached is not None),
             resource_path="/v1/page",
+            description=PAGE_DESCRIPTION,
             keys=app.state.keys,
         )
         if isinstance(payment, JSONResponse):
@@ -304,7 +323,7 @@ def create_app(
             facilitator=app.state.facilitator,
             amount=SEARCH_ATOMIC,
             resource_path="/v1/search",
-            description="Search already-fetched web snapshots",
+            description=SEARCH_DESCRIPTION,
             keys=app.state.keys,
         )
         if isinstance(payment, JSONResponse):
@@ -360,6 +379,7 @@ def create_app(
                     facilitator=app.state.facilitator,
                     amount=amount,
                     resource_path="/mcp",
+                    description=MCP_DESCRIPTION,
                     keys=app.state.keys,
                     tool_name=name,
                 )

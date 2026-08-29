@@ -5,6 +5,13 @@ from html import escape
 from afterimage.pricing import HIT_USDC, MISS_USDC, SEARCH_USDC
 from afterimage.settings import Settings
 
+ICON_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <rect width="32" height="32" rx="6" fill="#0e0d0b"/>
+  <text x="6" y="23" font-family="Georgia, serif" font-size="18" fill="#d89a4a">A</text>
+  <text x="7.5" y="24.5" font-family="Georgia, serif" font-size="18" fill="#efe6d6">A</text>
+</svg>
+"""
+
 
 def landing_html(settings: Settings) -> str:
     base = escape(settings.public_url.rstrip("/"))
@@ -14,6 +21,7 @@ def landing_html(settings: Settings) -> str:
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>AfterImage — shared copies of the public web for AI agents</title>
+  <link rel="icon" href="{base}/icon.svg" type="image/svg+xml">
   <meta name="description" content="If another agent already fetched a page, reuse that copy instead of scraping again. Timestamp plus sha256. Humans buy credits; agents send a key.">
   <style>
     :root {{

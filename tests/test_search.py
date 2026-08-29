@@ -104,6 +104,20 @@ def test_empty_corpus_returns_no_hits() -> None:
     assert body["hits"] == []
 
 
+def test_zero_hit_query_is_recorded_as_a_corpus_gap() -> None:
+    client, _fetcher = _client()
+    assert client.get("/v1/page", params={"url": "https://example.com/pricing"}).status_code == 200
+    empty = client.get("/v1/search", params={"q": "kubernetes operators"})
+    assert empty.json()["hits"] == []
+    assert empty.json()["indexed"] == 1
+
+    gaps = client.get("/v1/gaps").json()
+    queries = {row["q"]: row for row in gaps["queries"]}
+    assert "kubernetes operators" in queries
+    assert queries["kubernetes operators"]["n"] == 1
+    assert queries["kubernetes operators"]["indexed"] == 1
+
+
 def test_search_does_not_return_unrelated_pages() -> None:
     client, _fetcher = _client()
     assert client.get("/v1/page", params={"url": "https://example.com/pricing"}).status_code == 200

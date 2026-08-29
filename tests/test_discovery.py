@@ -80,6 +80,9 @@ def test_x402_well_known_advertises_the_page_resource() -> None:
     assert "/v1/page" in blob
     assert "/v1/search" in blob
     assert "usdc" in blob
+    assert body["resources"][0]["serviceName"] == "AfterImage"
+    assert body["resources"][0]["iconUrl"].endswith("/icon.svg")
+    assert "snapshot" in body["resources"][0]["tags"]
     cache = response.headers.get("cache-control", "").lower()
     assert "max-age=3600" not in cache
 

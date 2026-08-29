@@ -10,7 +10,7 @@ from afterimage.pricing import (
     SEARCH_ATOMIC,
     SEARCH_USDC,
 )
-from afterimage.x402 import bazaar_extension
+from afterimage.x402 import SERVICE_TAGS, bazaar_extension
 from afterimage.settings import USDC_EIP712_NAME, USDC_EIP712_VERSION, Settings
 
 SERVER_CARD_SCHEMA = (
@@ -225,28 +225,48 @@ def x402_well_known(settings: Settings) -> dict:
             {
                 "url": resource_url,
                 "description": (
-                    f"GET /v1/page. Reuse a stored copy (${HIT_USDC}) or fetch live (${MISS_USDC})."
+                    f"Fetch any public URL. Reuse a stored copy (${HIT_USDC}) "
+                    f"or fetch live (${MISS_USDC})."
                 ),
                 "mimeType": "application/json",
+                "serviceName": "AfterImage",
+                "tags": list(SERVICE_TAGS),
+                "iconUrl": f"{base}/icon.svg",
                 "accepts": [accept(MISS_ATOMIC)] if pay_to else [],
                 "extensions": bazaar_extension("/v1/page"),
             },
             {
                 "url": f"{base}/v1/search",
                 "description": (
-                    f"GET /v1/search. Search stored copies only. ${SEARCH_USDC}. "
-                    "Does not visit the live web."
+                    f"Search copies already fetched (${SEARCH_USDC}). "
+                    "Does not visit the live web. Empty hits: GET /v1/page."
                 ),
                 "mimeType": "application/json",
+                "serviceName": "AfterImage",
+                "tags": list(SERVICE_TAGS),
+                "iconUrl": f"{base}/icon.svg",
                 "accepts": [accept(SEARCH_ATOMIC)] if pay_to else [],
                 "extensions": bazaar_extension("/v1/search"),
             },
             {
                 "url": f"{base}/mcp",
-                "description": "MCP tools search_pages and get_page over streamable HTTP.",
+                "description": "MCP get_page: fetch any public URL, reuse a stored copy if fresh.",
                 "mimeType": "application/json",
+                "serviceName": "AfterImage",
+                "tags": list(SERVICE_TAGS),
+                "iconUrl": f"{base}/icon.svg",
                 "accepts": [accept(MISS_ATOMIC)] if pay_to else [],
                 "extensions": bazaar_extension("/mcp", tool_name="get_page"),
+            },
+            {
+                "url": f"{base}/mcp",
+                "description": "MCP search_pages: search copies already fetched. Does not hit the live web.",
+                "mimeType": "application/json",
+                "serviceName": "AfterImage",
+                "tags": list(SERVICE_TAGS),
+                "iconUrl": f"{base}/icon.svg",
+                "accepts": [accept(SEARCH_ATOMIC)] if pay_to else [],
+                "extensions": bazaar_extension("/mcp", tool_name="search_pages"),
             },
         ],
     }

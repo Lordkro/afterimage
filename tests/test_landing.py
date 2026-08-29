@@ -4,6 +4,14 @@ from afterimage.app import create_app
 from afterimage.settings import Settings
 
 
+def test_icon_svg_is_served() -> None:
+    client = TestClient(create_app())
+    response = client.get("/icon.svg")
+    assert response.status_code == 200
+    assert "svg" in response.headers["content-type"]
+    assert "<svg" in response.text
+
+
 def test_root_is_a_human_landing_page() -> None:
     client = TestClient(
         create_app(settings=Settings(public_url="https://afterimage.page"))
@@ -27,5 +35,6 @@ def test_root_is_a_human_landing_page() -> None:
     assert "AfterImageAfterImage" not in text
     assert "Caps:" in text
     assert "evicted after 10 days" in text
+    assert "/icon.svg" in text
     assert "100,000" in text
     assert "About 5,000" not in text

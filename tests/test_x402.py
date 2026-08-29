@@ -75,6 +75,11 @@ def test_paid_mode_challenges_unpaid_fetch_at_miss_price() -> None:
     assert bazaar["info"]["input"]["method"] == "GET"
     assert "url" in bazaar["info"]["input"]["queryParams"]
     assert "url" in bazaar["schema"]["properties"]["input"]["properties"]["queryParams"]["properties"]
+    resource = required["resource"]
+    assert resource["serviceName"] == "AfterImage"
+    assert "snapshot" in resource["tags"]
+    assert resource["iconUrl"].endswith("/icon.svg")
+    assert "any public URL" in resource["description"]
 
 
 def test_paid_mode_challenges_cache_hit_at_hit_price() -> None:

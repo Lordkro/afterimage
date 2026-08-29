@@ -39,6 +39,17 @@ class SqliteSnapshotStore:
         self._conn.commit()
         self._ensure_columns()
         self._backfill_fts()
+        self._conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS unmatched_queries (
+                q TEXT PRIMARY KEY,
+                n INTEGER NOT NULL,
+                indexed INTEGER NOT NULL,
+                last_at TEXT NOT NULL
+            )
+            """
+        )
+        self._conn.commit()
         self._lock = asyncio.Lock()
 
     def _ensure_columns(self) -> None:
@@ -170,6 +181,43 @@ class SqliteSnapshotStore:
                 (match, limit),
             ).fetchall()
         return [self._row_to_snapshot(row) for row in rows]
+
+    async def record_unmatched(self, q: str, *, indexed: int, at: datetime) -> None:
+        key = q.strip()
+        if not key:
+            return
+        stamp = at.astimezone(UTC).isoformat()
+        async with self._lock:
+            self._conn.execute(
+                """
+                INSERT INTO unmatched_queries (q, n, indexed, last_at)
+                VALUES (?, 1, ?, ?)
+                ON CONFLICT(q) DO UPDATE SET
+                    n = n + 1,
+                    indexed = excluded.indexed,
+                    last_at = excluded.last_at
+                """,
+                (key, indexed, stamp),
+            )
+            self._conn.commit()
+
+    async def unmatched_queries(self, *, limit: int = 50) -> list[dict]:
+        async with self._lock:
+            rows = self._conn.execute(
+                """
+                SELECT q, n, indexed, last_at FROM unmatched_queries
+                ORDER BY n DESC, last_at DESC
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+        out = []
+        for q, n, indexed, last_at in rows:
+            stamp = str(last_at)
+            if stamp.endswith("+00:00"):
+                stamp = stamp[:-6] + "Z"
+            out.append({"q": q, "n": int(n), "indexed": int(indexed), "last_at": stamp})
+        return out
 
     async def prune(self, *, now: datetime, ttl_s: int, max_snapshots: int) -> None:
         async with self._lock:
