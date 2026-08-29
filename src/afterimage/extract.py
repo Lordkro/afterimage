@@ -32,6 +32,22 @@ def _attr(attrs: list[tuple[str, str | None]], name: str) -> str:
 
 
 _ALWAYS_SKIP = {"script", "style", "noscript", "svg", "template"}
+_VOID_TAGS = {
+    "area",
+    "base",
+    "br",
+    "col",
+    "embed",
+    "hr",
+    "img",
+    "input",
+    "link",
+    "meta",
+    "param",
+    "source",
+    "track",
+    "wbr",
+}
 _JS_SHELL = re.compile(
     r"uh oh! there was an error while loading|please enable javascript|"
     r"you need to enable javascript to run this app|enable js to use this",
@@ -45,8 +61,10 @@ class _ReadableParser(HTMLParser):
         self.title_parts: list[str] = []
         self.body_parts: list[str] = []
         self.main_parts: list[str] = []
+        self.article_parts: list[str] = []
         self._skip_depth = 0
         self._main_depth = 0
+        self._article_depth = 0
         self._in_title = False
         self._skip_chrome = skip_chrome
         self._main_stack: list[str] = []
@@ -56,11 +74,14 @@ class _ReadableParser(HTMLParser):
         skip_tags = _SKIP_TAGS if self._skip_chrome else _ALWAYS_SKIP
         skip_roles = _SKIP_ROLES if self._skip_chrome else set()
         if self._skip_depth or tag in skip_tags or role in skip_roles:
-            self._skip_depth += 1
+            if tag not in _VOID_TAGS:
+                self._skip_depth += 1
             return
         if tag == "title":
             self._in_title = True
         cls = _attr(attrs, "class")
+        if tag == "article":
+            self._article_depth += 1
         if tag in _MAIN_TAGS:
             self._main_stack.append("main")
             self._main_depth += 1
@@ -68,8 +89,12 @@ class _ReadableParser(HTMLParser):
             self._main_stack.append("md")
             self._main_depth += 1
         if tag in {"p", "div", "h1", "h2", "h3", "h4", "li", "br", "tr", "section"}:
-            bucket = self.main_parts if self._main_depth else self.body_parts
-            bucket.append("\n")
+            self._bucket().append("\n")
+
+    def handle_startendtag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        self.handle_starttag(tag, attrs)
+        if tag not in _VOID_TAGS:
+            self.handle_endtag(tag)
 
     def handle_endtag(self, tag: str) -> None:
         if self._skip_depth:
@@ -77,6 +102,8 @@ class _ReadableParser(HTMLParser):
             return
         if tag == "title":
             self._in_title = False
+        if tag == "article" and self._article_depth:
+            self._article_depth -= 1
         if not self._main_stack:
             return
         top = self._main_stack[-1]
@@ -93,8 +120,14 @@ class _ReadableParser(HTMLParser):
         if self._in_title:
             self.title_parts.append(data)
             return
-        bucket = self.main_parts if self._main_depth else self.body_parts
-        bucket.append(data)
+        self._bucket().append(data)
+
+    def _bucket(self) -> list[str]:
+        if self._article_depth:
+            return self.article_parts
+        if self._main_depth:
+            return self.main_parts
+        return self.body_parts
 
 
 def extract_readable(body: bytes, content_type: str = "text/html") -> tuple[str, str]:
@@ -126,7 +159,12 @@ def _parse(html: str, *, skip_chrome: bool) -> tuple[str, str]:
     parser.feed(html)
     parser.close()
     title = re.sub(r"\s+", " ", "".join(parser.title_parts)).strip()
-    raw = parser.main_parts if "".join(parser.main_parts).strip() else parser.body_parts
+    if "".join(parser.article_parts).strip():
+        raw = parser.article_parts
+    elif "".join(parser.main_parts).strip():
+        raw = parser.main_parts
+    else:
+        raw = parser.body_parts
     text = re.sub(r"[ \t]+", " ", "".join(raw))
     text = re.sub(r"\n{3,}", "\n\n", text)
     lines = [line.strip() for line in text.splitlines()]

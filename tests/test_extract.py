@@ -61,6 +61,49 @@ def test_github_spa_shell_is_not_stored() -> None:
     assert body["stored_reason"] == "thin_extract"
 
 
+def test_mkdocs_article_is_preferred_over_sidebar() -> None:
+    html = b"""<!DOCTYPE html>
+<html>
+  <head><title>Background Tasks - FastAPI</title></head>
+  <body>
+    <header class="md-header">
+      <a href="/"><img src="logo.svg" alt="FastAPI"></a>
+      <form><input type="text" name="q"></form>
+      <p>Deploy on FastAPI Cloud</p>
+    </header>
+    <main class="md-main">
+      <nav class="md-nav" aria-label="Navigation">
+        <ul>
+          <li>Path Parameters</li>
+          <li>Query Parameters</li>
+          <li>Background Tasks</li>
+        </ul>
+      </nav>
+      <article class="md-content__inner md-typeset">
+        <h1>Background Tasks</h1>
+        <p>You can define background tasks to be run after returning a response.</p>
+      </article>
+    </main>
+  </body>
+</html>"""
+    text = (
+        TestClient(
+            create_app(
+                fetcher=FakeFetcher(
+                    {"https://example.com/bg-article": FakePage(body=html)}
+                ),
+                store=MemorySnapshotStore(),
+            )
+        )
+        .get("/v1/page", params={"url": "https://example.com/bg-article"})
+        .json()["text"]
+    )
+    assert "You can define background tasks to be run after returning a response." in text
+    assert "Path Parameters" not in text
+    assert "Query Parameters" not in text
+    assert "Deploy on FastAPI Cloud" not in text
+
+
 def test_mkdocs_content_div_is_extracted() -> None:
     html = b"""<!DOCTYPE html>
 <html>
