@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from pydantic import BaseModel, Field
 
 from afterimage.extract import extract_readable
+from afterimage.origin_cache import origin_cache_policy
 from afterimage.robots_archive import forbids_archive
 from afterimage.hashing import sha256_bytes
 from afterimage.models import Clock, Fetcher, Snapshot, SnapshotStore
@@ -29,6 +30,8 @@ class PageResponse(BaseModel):
     max_age_s: int = Field(default=DEFAULT_MAX_AGE_S)
     truncated: bool = False
     stored: bool = True
+    stored_reason: str | None = None
+    origin_max_age_s: int | None = None
 
 
 def iso_z(dt: datetime) -> str:
@@ -65,6 +68,8 @@ async def fresh_snapshot(
         return None
     age_s = int((clock.now() - existing.fetched_at).total_seconds())
     if ttl_s > 0 and age_s > ttl_s:
+        return None
+    if existing.origin_max_age_s is not None and age_s > existing.origin_max_age_s:
         return None
     if age_s <= max_age_s:
         return existing
@@ -108,6 +113,19 @@ async def snapshot_page(
     title, raw_text = extract_readable(fetched.body, fetched.content_type)
     text = truncate_text(raw_text, settings.max_text_chars)
     truncated = len(raw_text) > len(text)
+    policy = origin_cache_policy(headers=fetched.headers)
+    noarchive = forbids_archive(
+        headers=fetched.headers,
+        body=fetched.body,
+        content_type=fetched.content_type,
+    )
+    stored_reason = None
+    if noarchive:
+        stored_reason = "noarchive"
+    elif not policy.persist:
+        stored_reason = policy.reason
+    elif snapshot_status_blocks_store(fetched.status, settings.persist_error_pages):
+        stored_reason = "http_error"
     snapshot = Snapshot(
         url=url,
         final_url=fetched.final_url,
@@ -117,13 +135,9 @@ async def snapshot_page(
         content_hash=sha256_bytes(fetched.body),
         fetched_at=now,
         content_type=fetched.content_type,
+        origin_max_age_s=policy.max_age_s,
     )
-    noarchive = forbids_archive(
-        headers=fetched.headers,
-        body=fetched.body,
-        content_type=fetched.content_type,
-    )
-    keep = (settings.persist_error_pages or snapshot.status < 400) and not noarchive
+    keep = stored_reason is None
     if keep:
         await store.put(snapshot)
         await prune_corpus(store, settings, clock)
@@ -134,7 +148,12 @@ async def snapshot_page(
         max_age_s=max_age_s,
         truncated=truncated,
         stored=keep,
+        stored_reason=stored_reason,
     )
+
+
+def snapshot_status_blocks_store(status: int, persist_error_pages: bool) -> bool:
+    return status >= 400 and not persist_error_pages
 
 
 def _looks_truncated(text: str, max_chars: int) -> bool:
@@ -151,6 +170,7 @@ def _view(
     max_age_s: int,
     truncated: bool = False,
     stored: bool = True,
+    stored_reason: str | None = None,
 ) -> PageResponse:
     age_s = max(0, int((now - snapshot.fetched_at).total_seconds()))
     return PageResponse(
@@ -167,4 +187,6 @@ def _view(
         max_age_s=max_age_s,
         truncated=truncated,
         stored=stored,
+        stored_reason=stored_reason,
+        origin_max_age_s=snapshot.origin_max_age_s,
     )

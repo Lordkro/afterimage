@@ -45,6 +45,7 @@ def test_noarchive_page_is_returned_but_not_stored() -> None:
     ).json()
     assert "Secret recipe" in body["text"]
     assert body["stored"] is False
+    assert body["stored_reason"] == "noarchive"
     again = client.get(
         "/v1/page", params={"url": "https://example.com/secret"}
     ).json()
@@ -68,4 +69,5 @@ def test_x_robots_tag_noarchive_is_not_stored() -> None:
     )
     body = client.get("/v1/page", params={"url": "https://example.com/hdr"}).json()
     assert body["stored"] is False
+    assert body["stored_reason"] == "noarchive"
     assert "Leave me" in body["text"]

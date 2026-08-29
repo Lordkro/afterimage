@@ -25,6 +25,7 @@ class Snapshot:
     content_hash: str
     fetched_at: datetime
     content_type: str
+    origin_max_age_s: int | None = None
 
 
 class Fetcher(Protocol):

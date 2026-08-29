@@ -35,8 +35,17 @@ class SqliteSnapshotStore:
             """
         )
         self._conn.commit()
+        self._ensure_origin_max_age()
         self._backfill_fts()
         self._lock = asyncio.Lock()
+
+    def _ensure_origin_max_age(self) -> None:
+        cols = {row[1] for row in self._conn.execute("PRAGMA table_info(snapshots)")}
+        if "origin_max_age_s" not in cols:
+            self._conn.execute(
+                "ALTER TABLE snapshots ADD COLUMN origin_max_age_s INTEGER"
+            )
+            self._conn.commit()
 
     def _backfill_fts(self) -> None:
         count = self._conn.execute("SELECT COUNT(*) FROM snapshots_fts").fetchone()
@@ -54,8 +63,8 @@ class SqliteSnapshotStore:
     async def get(self, url: str) -> Snapshot | None:
         async with self._lock:
             row = self._conn.execute(
-                "SELECT url, final_url, status, title, text, content_hash, fetched_at, content_type "
-                "FROM snapshots WHERE url = ?",
+                "SELECT url, final_url, status, title, text, content_hash, fetched_at, "
+                "content_type, origin_max_age_s FROM snapshots WHERE url = ?",
                 (url,),
             ).fetchone()
         if row is None:
@@ -67,8 +76,9 @@ class SqliteSnapshotStore:
             self._conn.execute(
                 """
                 INSERT INTO snapshots (
-                    url, final_url, status, title, text, content_hash, fetched_at, content_type
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    url, final_url, status, title, text, content_hash, fetched_at,
+                    content_type, origin_max_age_s
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(url) DO UPDATE SET
                     final_url = excluded.final_url,
                     status = excluded.status,
@@ -76,7 +86,8 @@ class SqliteSnapshotStore:
                     text = excluded.text,
                     content_hash = excluded.content_hash,
                     fetched_at = excluded.fetched_at,
-                    content_type = excluded.content_type
+                    content_type = excluded.content_type,
+                    origin_max_age_s = excluded.origin_max_age_s
                 """,
                 (
                     snapshot.url,
@@ -87,6 +98,7 @@ class SqliteSnapshotStore:
                     snapshot.content_hash,
                     snapshot.fetched_at.astimezone(UTC).isoformat(),
                     snapshot.content_type,
+                    snapshot.origin_max_age_s,
                 ),
             )
             self._conn.execute(
@@ -118,7 +130,7 @@ class SqliteSnapshotStore:
             rows = self._conn.execute(
                 """
                 SELECT s.url, s.final_url, s.status, s.title, s.text, s.content_hash,
-                       s.fetched_at, s.content_type
+                       s.fetched_at, s.content_type, s.origin_max_age_s
                 FROM snapshots s
                 WHERE s.url IN (
                     SELECT url FROM snapshots_fts WHERE snapshots_fts MATCH ?
@@ -173,4 +185,5 @@ class SqliteSnapshotStore:
             content_hash=row[5],
             fetched_at=fetched_at.astimezone(UTC),
             content_type=row[7],
+            origin_max_age_s=int(row[8]) if len(row) > 8 and row[8] is not None else None,
         )

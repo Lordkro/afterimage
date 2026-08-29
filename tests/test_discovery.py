@@ -24,8 +24,11 @@ def test_llms_txt_tells_an_agent_how_to_call_afterimage() -> None:
     assert "x402" in text.lower()
     assert "/v1/stats" in text
     assert "robots.txt" in text.lower() or "robots.txt" in text
-    assert "does not currently honor" in text.lower()
+    assert "does not currently honor origin" in text.lower()
+    assert "robots.txt" in text.lower()
     assert "noarchive" in text.lower()
+    assert "no-store" in text.lower()
+    assert "always bill" in text.lower() or "live-fetch" in text.lower()
     assert "removal@afterimage.page" in text
 
 

@@ -130,7 +130,11 @@ Response:
 - hash: sha256 of the raw response body
 - fetched_at, age_s, status, title, final_url
 - truncated: true if text hit the character cap
+- stored: false if AfterImage did not keep a copy
+- stored_reason: noarchive | no-store | private | http_error
+- origin_max_age_s: origin Cache-Control max-age/s-maxage, if present
 
+Reuse of a stored copy is min(your max_age_s, origin_max_age_s, 7-day TTL).
 If you already have the URL from a search hit, call /v1/page to get the full text.
 If cache=hit, do not fetch the origin yourself unless you need a smaller max_age_s.
 
@@ -157,10 +161,12 @@ Also: GET {base}/mcp/server-card
 
 AfterImage caches public http(s) pages for agents. It rejects private/internal
 addresses and does not follow logins. It does not currently honor origin
-robots.txt or noarchive. Copies are evicted after 7 days or when the 5,000-page
-cap drops the oldest. Caps and live size: GET {base}/v1/stats.
-Live fetch honors noarchive (meta robots and X-Robots-Tag): the caller still
-gets the page, AfterImage does not store it.
+robots.txt crawl rules.
+Live fetch honors noarchive (meta robots and X-Robots-Tag) and Cache-Control
+no-store / private: the caller still gets the page; AfterImage does not store
+it. Those URLs never become cache hits and always bill at the live-fetch rate.
+Copies that are stored are evicted after 7 days or when the 5,000-page cap
+drops the oldest. Caps and live size: GET {base}/v1/stats.
 To request removal of a stored URL, email {settings.removal_email}.
 """
 
