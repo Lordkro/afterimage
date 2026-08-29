@@ -138,7 +138,7 @@ Response:
 - fetched_at, age_s, status, title, final_url
 - truncated: true if text hit the character cap
 - stored: false if AfterImage did not keep a copy
-- stored_reason: noarchive | no-store | private | vary | http_error | thin_extract | volatile
+- stored_reason: noarchive | no-store | private | vary | http_error | thin_extract | volatile | challenge
 - origin_max_age_s: remaining origin freshness in seconds (s-maxage/max-age
   minus Age, or Expires; 0 for no-cache). Reuse is min(your max_age_s,
   origin_max_age_s, {settings.snapshot_ttl_days}-day TTL).
@@ -178,7 +178,14 @@ no-store / private / Vary: *: the caller still gets the page; AfterImage does
 not store it. Those URLs never become cache hits and always bill at the
 live-fetch rate. Cache-Control: no-cache is stored for search but origin
 freshness is 0, so /v1/page always refetches. Age is subtracted from max-age.
-Status pages (status.openai.com and similar) are fetched live and never stored.
+stored_reason is why a live fetch was not kept:
+- noarchive / no-store / private / vary: the origin asked not to cache
+- volatile: AfterImage will not index status pages (stale "up" is worse than a miss)
+- challenge: bot interstitial (Cloudflare and similar)
+- thin_extract / http_error: extract was a JS shell, title-only, an order of
+  magnitude shorter than the copy already stored, or an HTTP error
+Origin-forbids and volatile delete any stored copy. challenge and thin_extract
+leave the previous copy in place so a wall does not replace a working snapshot.
 Copies that are stored are evicted after {settings.snapshot_ttl_days} days or when the 5,000-page cap
 drops the oldest. Caps and live size: GET {base}/v1/stats.
 To request removal of a stored URL, email {settings.removal_email}.

@@ -43,7 +43,7 @@ async def snapshot(
     sem: asyncio.Semaphore,
     api_key: str | None,
     max_age_s: int,
-) -> tuple[str, str, int | None]:
+) -> tuple[str, str, int | None, bool | None, str | None, int | None]:
     async with sem:
         try:
             response = await client.get(
@@ -52,11 +52,20 @@ async def snapshot(
                 headers=_headers(api_key),
             )
         except httpx.HTTPError as exc:
-            return url, f"error:{type(exc).__name__}", None
+            return url, f"error:{type(exc).__name__}", None, None, None, None
         if response.status_code != 200:
-            return url, f"http:{response.status_code}", None
+            return url, f"http:{response.status_code}", None, None, None, None
         body = response.json()
-        return url, str(body.get("cache")), body.get("status")
+        text = body.get("text") or ""
+        stored = body.get("stored")
+        return (
+            url,
+            str(body.get("cache")),
+            body.get("status"),
+            stored if isinstance(stored, bool) else None,
+            body.get("stored_reason"),
+            len(text) if isinstance(text, str) else None,
+        )
 
 
 async def main() -> int:
@@ -91,13 +100,18 @@ async def main() -> int:
             for url in urls
         ]
         for coro in asyncio.as_completed(tasks):
-            url, cache, status = await coro
-            kept = cache in {"hit", "miss"} and status is not None and status < 400
+            url, cache, status, was_stored, reason, chars = await coro
+            kept = was_stored is True
             if kept:
                 ok += 1
                 stored += 1
             mark = "ok" if kept else "skip"
-            print(f"{mark:4} {cache:12} {status!s:>4} {url}", flush=True)
+            chars_s = "-" if chars is None else str(chars)
+            why = reason or ("stored" if kept else "")
+            print(
+                f"{mark:4} {cache:12} {status!s:>4} chars={chars_s:<6} {why:<16} {url}",
+                flush=True,
+            )
     search = httpx.get(
         f"{args.host.rstrip('/')}/v1/search",
         params={"q": "python"},

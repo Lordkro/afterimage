@@ -53,6 +53,14 @@ _JS_SHELL = re.compile(
     r"you need to enable javascript to run this app|enable js to use this",
     re.I,
 )
+_CHALLENGE = re.compile(
+    r"verifying you are human|just a moment\.\.\.|attention required|"
+    r"checking your browser before accessing|enable javascript and cookies to continue|"
+    r"why do i have to complete a captcha|cloudflare ray id|"
+    r"cf-browser-verification|cf-challenge|cf-turnstile|"
+    r"sorry, you have been blocked",
+    re.I,
+)
 
 
 class _ReadableParser(HTMLParser):
@@ -152,6 +160,17 @@ def unusable_extract(title: str, text: str) -> bool:
     if title and compact.lower() == title.lower():
         return True
     return False
+
+
+def is_challenge_page(title: str, text: str, body: bytes = b"") -> bool:
+    haystack = f"{title}\n{text}\n{body.decode('utf-8', errors='replace')}"
+    return bool(_CHALLENGE.search(haystack))
+
+
+def worse_extract(previous: str, new: str) -> bool:
+    if len(previous) < 80:
+        return False
+    return len(new) * 10 < len(previous)
 
 
 def _parse(html: str, *, skip_chrome: bool) -> tuple[str, str]:

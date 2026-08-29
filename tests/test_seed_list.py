@@ -38,3 +38,6 @@ def test_seed_list_is_the_moving_class() -> None:
     assert "/docs/models" in blob or "/models" in blob
     assert "pricing" in blob
     assert "release-notes" in blob or "changelog" in blob
+    assert "deprecations" in blob
+    assert "rate-limits" in blob
+    assert "pypi.org/pypi/" in blob

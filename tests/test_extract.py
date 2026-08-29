@@ -1,7 +1,7 @@
 from fastapi.testclient import TestClient
 
 from afterimage.app import create_app
-from tests.fakes import FakeFetcher, FakePage, MemorySnapshotStore
+from tests.fakes import FakeClock, FakeFetcher, FakePage, MemorySnapshotStore
 
 CHROME_HTML = b"""<!DOCTYPE html>
 <html>
@@ -37,6 +37,92 @@ def test_extract_skips_nav_banner_and_prefers_main() -> None:
     assert "Deploy on FastAPI Cloud" not in text
     assert "Docs Reference" not in text
     assert "Copyright FastAPI" not in text
+
+
+def test_bot_challenge_page_is_not_stored() -> None:
+    html = b"""<!DOCTYPE html>
+<html>
+  <head><title>Just a moment...</title></head>
+  <body>
+    <h1>Verifying you are human. This may take a few seconds.</h1>
+    <p>Cloudflare Ray ID: 9a1b2c3d4e5f</p>
+  </body>
+</html>"""
+    body = (
+        TestClient(
+            create_app(
+                fetcher=FakeFetcher(
+                    {"https://docs.example.com/models": FakePage(body=html)}
+                ),
+                store=MemorySnapshotStore(),
+            )
+        )
+        .get("/v1/page", params={"url": "https://docs.example.com/models"})
+        .json()
+    )
+    assert body["stored"] is False
+    assert body["stored_reason"] == "challenge"
+    assert "Verifying you are human" in body["text"]
+
+
+def test_challenge_fetch_keeps_the_previous_snapshot() -> None:
+    url = "https://docs.example.com/models"
+    good = FakePage(
+        body=(
+            b"<!DOCTYPE html><html><head><title>Models</title></head>"
+            b"<body><main><p>gpt-4o context window is 128k tokens.</p></main></body></html>"
+        )
+    )
+    wall = FakePage(
+        body=(
+            b"<!DOCTYPE html><html><head><title>Just a moment...</title></head>"
+            b"<body><h1>Verifying you are human</h1></body></html>"
+        )
+    )
+    fetcher = FakeFetcher({url: good})
+    store = MemorySnapshotStore()
+    clock = FakeClock()
+    client = TestClient(create_app(fetcher=fetcher, store=store, clock=clock))
+    first = client.get("/v1/page", params={"url": url}).json()
+    assert first["stored"] is True
+    fetcher.pages[url] = wall
+    clock.advance(1)
+    second = client.get("/v1/page", params={"url": url, "max_age_s": 0}).json()
+    assert second["stored"] is False
+    assert second["stored_reason"] == "challenge"
+    search = client.get("/v1/search", params={"q": "gpt-4o"}).json()
+    assert search["indexed"] == 1
+    assert "128k" in search["hits"][0]["snippet"]
+
+
+def test_much_shorter_extract_does_not_replace_a_good_snapshot() -> None:
+    url = "https://docs.example.com/models"
+    body_text = ("gpt-4o context window is 128k tokens. " * 20).strip()
+    good = FakePage(
+        body=(
+            b"<!DOCTYPE html><html><head><title>Models</title></head>"
+            + f"<body><main><p>{body_text}</p></main></body></html>".encode()
+        )
+    )
+    stub = FakePage(
+        body=(
+            b"<!DOCTYPE html><html><head><title>Models</title></head>"
+            b"<body><main><p>Loading the model table.</p></main></body></html>"
+        )
+    )
+    fetcher = FakeFetcher({url: good})
+    store = MemorySnapshotStore()
+    clock = FakeClock()
+    client = TestClient(create_app(fetcher=fetcher, store=store, clock=clock))
+    assert client.get("/v1/page", params={"url": url}).json()["stored"] is True
+    fetcher.pages[url] = stub
+    clock.advance(1)
+    second = client.get("/v1/page", params={"url": url, "max_age_s": 0}).json()
+    assert second["stored"] is False
+    assert second["stored_reason"] == "thin_extract"
+    search = client.get("/v1/search", params={"q": "gpt-4o"}).json()
+    assert search["indexed"] == 1
+    assert "128k" in search["hits"][0]["snippet"]
 
 
 def test_github_spa_shell_is_not_stored() -> None:

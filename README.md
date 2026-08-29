@@ -77,4 +77,4 @@ Set `AFTERIMAGE_STRIPE_SECRET_KEY` and `AFTERIMAGE_STRIPE_WEBHOOK_SECRET` to cha
 
 Caps: **5,000** pages, **32,000** characters per page, evicted after **10 days**. Error pages and status pages are not stored. Private/internal URLs are rejected. Oldest pages are dropped when the cap is hit. Live size: `GET /v1/stats` (free). Origin `robots.txt` is not honored today.
 
-`scripts/seed.py` refills model catalogs, prices, versioned protocol specs, changelogs, and the FastAPI/Pydantic stack. GitHub Actions can run it Mondays if the repo secret `AFTERIMAGE_API_KEY` is a funded key. Weekly crawl, 10-day TTL, so a late or failed run does not empty the index.
+`scripts/seed.py` refills model catalogs, prices, versioned protocol specs, changelogs, deprecations, rate limits, and the FastAPI/Pydantic stack. GitHub Actions can run it Mondays if the repo secret `AFTERIMAGE_API_KEY` is a funded key. Weekly crawl, 10-day TTL, so a late or failed run does not empty the index. The seed log prints `chars=` and `stored_reason` per URL; a 10× drop is a challenge page or an empty shell.

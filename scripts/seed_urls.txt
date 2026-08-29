@@ -46,6 +46,8 @@ https://modelcontextprotocol.io/docs/concepts/transports
 https://modelcontextprotocol.io/docs/learn/architecture
 https://modelcontextprotocol.io/docs/develop/build-server
 https://a2a-protocol.org/latest/specification/
+https://a2a-protocol.org/latest/topics/what-is-a2a/
+https://modelcontextprotocol.io/specification/draft
 https://spec.openapis.org/oas/latest.html
 https://llmstxt.org/
 
@@ -67,6 +69,47 @@ https://docs.pydantic.dev/latest/changelog/
 https://docs.stripe.com/changelog
 https://github.blog/changelog/
 https://www.python.org/downloads/
+https://docs.anthropic.com/en/release-notes/api
+https://docs.anthropic.com/en/release-notes/claude-apps
+https://platform.openai.com/docs/changelog
+https://ai.google.dev/gemini-api/docs/changelog
+https://openrouter.ai/announcements
+
+# Deprecations, sunsets, rate limits
+https://platform.openai.com/docs/deprecations
+https://docs.anthropic.com/en/docs/about-claude/model-deprecations
+https://platform.openai.com/docs/guides/rate-limits
+https://docs.anthropic.com/en/api/rate-limits
+https://console.groq.com/docs/rate-limits
+
+# Infra pricing and limits
+https://railway.com/pricing
+https://vercel.com/docs/limits
+https://developers.cloudflare.com/workers/platform/limits/
+https://fly.io/docs/about/pricing/
+https://supabase.com/pricing
+https://neon.com/docs/introduction/plans
+
+# Majors that broke things models still remember
+https://tailwindcss.com/docs/upgrade-guide
+https://react.dev/blog
+https://nextjs.org/docs/app/guides/upgrading/version-16
+https://docs.pydantic.dev/latest/migration/
+https://docs.astral.sh/ruff/versioning/
+
+# Current package versions (JSON, cheap, rarely bot-walled)
+https://pypi.org/pypi/fastapi/json
+https://pypi.org/pypi/pydantic/json
+https://pypi.org/pypi/httpx/json
+https://pypi.org/pypi/uvicorn/json
+https://pypi.org/pypi/starlette/json
+https://pypi.org/pypi/stripe/json
+https://pypi.org/pypi/ruff/json
+https://pypi.org/pypi/uv/json
+https://pypi.org/pypi/mcp/json
+https://pypi.org/pypi/openai/json
+https://pypi.org/pypi/anthropic/json
+https://registry.npmjs.org/next/latest
 
 # Agent-facing Python service stack (moves with versions)
 https://fastapi.tiangolo.com/

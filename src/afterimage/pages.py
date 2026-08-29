@@ -4,7 +4,12 @@ from datetime import UTC, datetime
 
 from pydantic import BaseModel, Field
 
-from afterimage.extract import extract_readable, unusable_extract
+from afterimage.extract import (
+    extract_readable,
+    is_challenge_page,
+    unusable_extract,
+    worse_extract,
+)
 from afterimage.hashing import sha256_bytes
 from afterimage.models import Clock, Fetcher, Snapshot, SnapshotStore
 from afterimage.origin_cache import origin_cache_policy
@@ -95,8 +100,9 @@ async def snapshot_page(
         max_age_s = 0
     await prune_corpus(store, settings, clock)
     now = clock.now()
-    existing = None
+    previous = None
     if not is_volatile_url(url):
+        previous = await store.get(url)
         existing = await fresh_snapshot(
             url,
             max_age_s=max_age_s,
@@ -104,16 +110,16 @@ async def snapshot_page(
             clock=clock,
             ttl_s=settings.snapshot_ttl_s,
         )
-    if existing is not None:
-        truncated = _looks_truncated(existing.text, settings.max_text_chars)
-        return _view(
-            existing,
-            now=now,
-            cache="hit",
-            max_age_s=max_age_s,
-            truncated=truncated,
-            stored=True,
-        )
+        if existing is not None:
+            truncated = _looks_truncated(existing.text, settings.max_text_chars)
+            return _view(
+                existing,
+                now=now,
+                cache="hit",
+                max_age_s=max_age_s,
+                truncated=truncated,
+                stored=True,
+            )
 
     fetched = await fetcher.fetch(url)
     title, raw_text = extract_readable(fetched.body, fetched.content_type)
@@ -134,7 +140,11 @@ async def snapshot_page(
         stored_reason = policy.reason
     elif snapshot_status_blocks_store(fetched.status, settings.persist_error_pages):
         stored_reason = "http_error"
+    elif is_challenge_page(title, text, fetched.body):
+        stored_reason = "challenge"
     elif unusable_extract(title, text):
+        stored_reason = "thin_extract"
+    elif previous is not None and worse_extract(previous.text, text):
         stored_reason = "thin_extract"
     snapshot = Snapshot(
         url=url,
@@ -154,7 +164,7 @@ async def snapshot_page(
     if keep:
         await store.put(snapshot)
         await prune_corpus(store, settings, clock)
-    else:
+    elif stored_reason in {"noarchive", "no-store", "private", "vary", "volatile"}:
         await store.delete(url)
     return _view(
         snapshot,
