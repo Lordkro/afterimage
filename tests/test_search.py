@@ -55,6 +55,7 @@ def test_search_finds_a_previously_fetched_page_without_refetching() -> None:
     assert hit["url"] == "https://example.com/pricing"
     assert hit["title"] == "Pricing"
     assert "$9" in hit["snippet"]
+    assert hit["snippet"] != hit["title"]
     assert hit["hash"] == seeded.json()["hash"]
     assert hit["fetched_at"] == seeded.json()["fetched_at"]
     assert fetcher.calls == []

@@ -122,6 +122,11 @@ class SqliteSnapshotStore:
             )
             self._conn.commit()
 
+    async def delete(self, url: str) -> None:
+        async with self._lock:
+            self._delete_urls([url])
+            self._conn.commit()
+
     async def count(self) -> int:
         async with self._lock:
             row = self._conn.execute("SELECT COUNT(*) FROM snapshots").fetchone()

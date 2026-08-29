@@ -31,8 +31,16 @@ def _attr(attrs: list[tuple[str, str | None]], name: str) -> str:
     return ""
 
 
+_ALWAYS_SKIP = {"script", "style", "noscript", "svg", "template"}
+_JS_SHELL = re.compile(
+    r"uh oh! there was an error while loading|please enable javascript|"
+    r"you need to enable javascript to run this app|enable js to use this",
+    re.I,
+)
+
+
 class _ReadableParser(HTMLParser):
-    def __init__(self) -> None:
+    def __init__(self, *, skip_chrome: bool = True) -> None:
         super().__init__(convert_charrefs=True)
         self.title_parts: list[str] = []
         self.body_parts: list[str] = []
@@ -40,15 +48,24 @@ class _ReadableParser(HTMLParser):
         self._skip_depth = 0
         self._main_depth = 0
         self._in_title = False
+        self._skip_chrome = skip_chrome
+        self._main_stack: list[str] = []
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         role = _attr(attrs, "role")
-        if self._skip_depth or tag in _SKIP_TAGS or role in _SKIP_ROLES:
+        skip_tags = _SKIP_TAGS if self._skip_chrome else _ALWAYS_SKIP
+        skip_roles = _SKIP_ROLES if self._skip_chrome else set()
+        if self._skip_depth or tag in skip_tags or role in skip_roles:
             self._skip_depth += 1
             return
         if tag == "title":
             self._in_title = True
+        cls = _attr(attrs, "class")
         if tag in _MAIN_TAGS:
+            self._main_stack.append("main")
+            self._main_depth += 1
+        elif tag == "div" and ("md-content" in cls or "md-typeset" in cls):
+            self._main_stack.append("md")
             self._main_depth += 1
         if tag in {"p", "div", "h1", "h2", "h3", "h4", "li", "br", "tr", "section"}:
             bucket = self.main_parts if self._main_depth else self.body_parts
@@ -60,7 +77,14 @@ class _ReadableParser(HTMLParser):
             return
         if tag == "title":
             self._in_title = False
-        if tag in _MAIN_TAGS and self._main_depth:
+        if not self._main_stack:
+            return
+        top = self._main_stack[-1]
+        if tag in _MAIN_TAGS and top == "main":
+            self._main_stack.pop()
+            self._main_depth -= 1
+        elif tag == "div" and top == "md":
+            self._main_stack.pop()
             self._main_depth -= 1
 
     def handle_data(self, data: str) -> None:
@@ -77,7 +101,28 @@ def extract_readable(body: bytes, content_type: str = "text/html") -> tuple[str,
     """Return (title, readable text). Never returns raw markup."""
     charset = _charset(content_type)
     html = body.decode(charset, errors="replace")
-    parser = _ReadableParser()
+    title, text = _parse(html, skip_chrome=True)
+    if unusable_extract(title, text):
+        title2, text2 = _parse(html, skip_chrome=False)
+        if len(text2) > len(text):
+            title = title or title2
+            text = text2
+    return title, text
+
+
+def unusable_extract(title: str, text: str) -> bool:
+    compact = re.sub(r"\s+", " ", text).strip()
+    if not compact:
+        return True
+    if _JS_SHELL.search(compact):
+        return True
+    if title and compact.lower() == title.lower():
+        return True
+    return False
+
+
+def _parse(html: str, *, skip_chrome: bool) -> tuple[str, str]:
+    parser = _ReadableParser(skip_chrome=skip_chrome)
     parser.feed(html)
     parser.close()
     title = re.sub(r"\s+", " ", "".join(parser.title_parts)).strip()

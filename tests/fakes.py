@@ -43,6 +43,9 @@ class MemorySnapshotStore:
     async def put(self, snapshot: Snapshot) -> None:
         self._by_url[snapshot.url] = snapshot
 
+    async def delete(self, url: str) -> None:
+        self._by_url.pop(url, None)
+
     async def count(self) -> int:
         return len(self._by_url)
 

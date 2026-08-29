@@ -103,15 +103,7 @@ https://openrouter.ai/docs
 https://docs.anthropic.com/en/docs/about-claude/models
 https://platform.openai.com/docs/models
 
-# Changelogs / releases
-https://github.com/encode/httpx/releases
-https://github.com/pydantic/pydantic/releases
-https://github.com/fastapi/fastapi/releases
-https://github.com/astral-sh/ruff/releases
-https://github.com/astral-sh/uv/releases
-https://github.com/python/cpython/releases
-https://github.com/pallets/flask/releases
-https://github.com/django/django/releases
+# Version pages that are HTML, not GitHub SPA shells
 https://www.python.org/downloads/
 https://www.python.org/downloads/release/python-3140/
 

@@ -63,9 +63,13 @@ def snippet_for(snapshot: Snapshot, tokens: list[str]) -> str:
     if not text:
         return snapshot.title
     lower = text.lower()
+    title = (snapshot.title or "").strip().lower()
+    skip = len(title) if title and lower.startswith(title) else 0
     index = -1
     for token in tokens:
-        found = lower.find(token)
+        found = lower.find(token, skip)
+        if found == -1:
+            found = lower.find(token)
         if found != -1 and (index == -1 or found < index):
             index = found
     if index == -1:

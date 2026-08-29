@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 
 from pydantic import BaseModel, Field
 
-from afterimage.extract import extract_readable
+from afterimage.extract import extract_readable, unusable_extract
 from afterimage.origin_cache import origin_cache_policy
 from afterimage.robots_archive import forbids_archive
 from afterimage.hashing import sha256_bytes
@@ -129,6 +129,8 @@ async def snapshot_page(
         stored_reason = policy.reason
     elif snapshot_status_blocks_store(fetched.status, settings.persist_error_pages):
         stored_reason = "http_error"
+    elif unusable_extract(title, text):
+        stored_reason = "thin_extract"
     snapshot = Snapshot(
         url=url,
         final_url=fetched.final_url,
@@ -147,6 +149,8 @@ async def snapshot_page(
     if keep:
         await store.put(snapshot)
         await prune_corpus(store, settings, clock)
+    else:
+        await store.delete(url)
     return _view(
         snapshot,
         now=now,

@@ -138,7 +138,7 @@ Response:
 - fetched_at, age_s, status, title, final_url
 - truncated: true if text hit the character cap
 - stored: false if AfterImage did not keep a copy
-- stored_reason: noarchive | no-store | private | vary | http_error
+- stored_reason: noarchive | no-store | private | vary | http_error | thin_extract
 - origin_max_age_s: remaining origin freshness in seconds (s-maxage/max-age
   minus Age, or Expires; 0 for no-cache). Reuse is min(your max_age_s,
   origin_max_age_s, 7-day TTL).
