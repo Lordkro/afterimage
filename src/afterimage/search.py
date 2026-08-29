@@ -7,7 +7,7 @@ from fastapi import HTTPException
 from pydantic import BaseModel, Field
 
 from afterimage.models import Clock, Snapshot, SnapshotStore
-from afterimage.pages import iso_z, prune_corpus
+from afterimage.pages import iso_z, looks_truncated, prune_corpus
 from afterimage.pricing import SEARCH_USDC
 from afterimage.settings import Settings
 
@@ -25,6 +25,8 @@ class SearchHit(BaseModel):
     age_s: int
     status: int
     score: float
+    truncated: bool = False
+    aliases: list[str] = Field(default_factory=list)
 
 
 class SearchResponse(BaseModel):
@@ -115,6 +117,15 @@ async def search_corpus(
             continue
         ranked.append((score, snapshot.fetched_at, snapshot))
     ranked.sort(key=lambda item: (-item[0], -item[1].timestamp()))
+    unique: list[tuple[float, Snapshot, list[str]]] = []
+    index_for_hash: dict[str, int] = {}
+    for score, _fetched_at, snapshot in ranked:
+        digest = snapshot.content_hash
+        if digest in index_for_hash:
+            unique[index_for_hash[digest]][2].append(snapshot.url)
+            continue
+        index_for_hash[digest] = len(unique)
+        unique.append((score, snapshot, []))
     hits = [
         SearchHit(
             url=snapshot.url,
@@ -125,8 +136,10 @@ async def search_corpus(
             age_s=max(0, int((now - snapshot.fetched_at).total_seconds())),
             status=snapshot.status,
             score=round(score, 3),
+            truncated=looks_truncated(snapshot.text, settings.max_text_chars),
+            aliases=aliases,
         )
-        for score, _fetched_at, snapshot in ranked[:limit]
+        for score, snapshot, aliases in unique[:limit]
     ]
     return SearchResponse(
         q=q,

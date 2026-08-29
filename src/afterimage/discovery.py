@@ -111,7 +111,8 @@ Query:
 
 Response:
 - indexed: how many copies are stored
-- hits[]: url, title, snippet, hash, fetched_at, age_s, status, score
+- hits[]: url, title, snippet, hash, fetched_at, age_s, status, score,
+  truncated, aliases (other URLs with the same hash)
 GET {base}/v1/stats is free and returns live indexed plus caps.
 If indexed is 0, the library is empty. Fetch URLs with /v1/page, then search again.
 If hits is empty but indexed > 0, nothing matched. Try different words or fetch the URL.

@@ -29,8 +29,13 @@ https://modelcontextprotocol.io/
 https://modelcontextprotocol.io/specification/2024-11-05
 https://modelcontextprotocol.io/specification/2025-03-26
 https://modelcontextprotocol.io/specification/2025-06-18
+https://modelcontextprotocol.io/specification/2025-06-18/basic
 https://modelcontextprotocol.io/specification/2025-11-25
+https://modelcontextprotocol.io/specification/2025-11-25/basic
+https://modelcontextprotocol.io/specification/2025-11-25/server/tools
 https://modelcontextprotocol.io/specification/2026-07-28
+https://modelcontextprotocol.io/specification/2026-07-28/basic
+https://modelcontextprotocol.io/specification/2026-07-28/server/tools
 https://modelcontextprotocol.io/docs/concepts/tools
 https://modelcontextprotocol.io/docs/concepts/resources
 https://modelcontextprotocol.io/docs/concepts/prompts
@@ -52,7 +57,6 @@ https://docs.x402.org/core-concepts/client-server
 https://docs.cdp.coinbase.com/x402/welcome
 https://docs.cdp.coinbase.com/x402/seller/get-discovered
 https://docs.cdp.coinbase.com/x402/seller/facilitator
-https://docs.payai.network/introduction
 
 # Changelogs and release notes
 https://fastapi.tiangolo.com/release-notes/
@@ -122,7 +126,6 @@ https://docs.pytest.org/en/stable/how-to/fixtures.html
 https://docs.astral.sh/ruff/
 https://docs.astral.sh/uv/
 https://hatch.pypa.io/latest/
-https://docs.railway.com/
 https://docs.railway.com/guides/variables
 https://docs.railway.com/guides/volumes
 https://docs.railway.com/reference/variables

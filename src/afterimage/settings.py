@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     sqlite_path: str = "data/afterimage.db"
     # Cache, not an archive. These caps keep the Railway volume small.
     max_snapshots: int = 5_000
-    max_text_chars: int = 32_000
+    max_text_chars: int = 100_000
     snapshot_ttl_s: int = 10 * 24 * 60 * 60
     persist_error_pages: bool = False
     removal_email: str = "removal@afterimage.page"

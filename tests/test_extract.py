@@ -125,6 +125,31 @@ def test_much_shorter_extract_does_not_replace_a_good_snapshot() -> None:
     assert "128k" in search["hits"][0]["snippet"]
 
 
+def test_first_fetch_under_one_thousand_chars_is_not_stored() -> None:
+    paragraph = ("PayAI is building tools for agentic commerce. " * 16).strip()
+    assert 400 < len(paragraph) < 1000
+    html = (
+        b"<!DOCTYPE html><html><head><title>Introduction - PayAI</title></head>"
+        b"<body><script>" + b"x" * 8_000 + b"</script>"
+        + f"<main><p>{paragraph}</p></main></body></html>".encode()
+    )
+    body = (
+        TestClient(
+            create_app(
+                fetcher=FakeFetcher(
+                    {"https://docs.payai.network/introduction": FakePage(body=html)}
+                ),
+                store=MemorySnapshotStore(),
+            )
+        )
+        .get("/v1/page", params={"url": "https://docs.payai.network/introduction"})
+        .json()
+    )
+    assert body["stored"] is False
+    assert body["stored_reason"] == "thin_extract"
+    assert "agentic commerce" in body["text"]
+
+
 def test_fat_html_with_tiny_extract_is_not_stored() -> None:
     html = (
         b"<!DOCTYPE html><html><head><title>Models - Perplexity</title></head>"

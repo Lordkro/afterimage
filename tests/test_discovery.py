@@ -33,6 +33,8 @@ def test_llms_txt_tells_an_agent_how_to_call_afterimage() -> None:
     assert "always bill" in text.lower() or "live-fetch" in text.lower()
     assert "volatile" in text.lower()
     assert "challenge" in text.lower()
+    assert "truncated" in text.lower()
+    assert "aliases" in text.lower()
     assert "10-day" in text or "10 days" in text
     assert "status pages" in text.lower()
     assert "origin asked" in text.lower() or "origin" in text.lower()

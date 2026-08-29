@@ -112,7 +112,7 @@ async def snapshot_page(
             ttl_s=settings.snapshot_ttl_s,
         )
         if existing is not None:
-            truncated = _looks_truncated(existing.text, settings.max_text_chars)
+            truncated = looks_truncated(existing.text, settings.max_text_chars)
             return _view(
                 existing,
                 now=now,
@@ -183,7 +183,7 @@ def snapshot_status_blocks_store(status: int, persist_error_pages: bool) -> bool
     return status >= 400 and not persist_error_pages
 
 
-def _looks_truncated(text: str, max_chars: int) -> bool:
+def looks_truncated(text: str, max_chars: int) -> bool:
     if max_chars <= 0 or len(text) < max_chars - 1:
         return False
     return text.endswith("…")

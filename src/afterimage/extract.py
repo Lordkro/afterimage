@@ -159,7 +159,7 @@ def unusable_extract(title: str, text: str, *, body_len: int = 0) -> bool:
         return True
     if title and compact.lower() == title.lower():
         return True
-    if body_len >= 40_000 and len(compact) < 120:
+    if body_len >= 4_000 and len(compact) < 1_000:
         return True
     return False
 
