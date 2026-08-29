@@ -1,7 +1,9 @@
 from fastapi.testclient import TestClient
 
 from afterimage.app import create_app
+from afterimage.landing import prefers_html
 from afterimage.settings import Settings
+from tests.fakes import MemorySnapshotStore
 
 
 def test_icon_svg_is_served() -> None:
@@ -14,7 +16,10 @@ def test_icon_svg_is_served() -> None:
 
 def test_root_is_a_human_landing_page() -> None:
     client = TestClient(
-        create_app(settings=Settings(public_url="https://afterimage.page"))
+        create_app(
+            settings=Settings(public_url="https://afterimage.page"),
+            store=MemorySnapshotStore(),
+        )
     )
 
     response = client.get("/")
@@ -38,3 +43,16 @@ def test_root_is_a_human_landing_page() -> None:
     assert "/icon.svg" in text
     assert "100,000" in text
     assert "About 5,000" not in text
+    assert "{{" not in text
+    assert 'data-pack="starter"' in text
+    assert "Buy $5 credits" in text
+    assert "/v1/stats" in text
+    assert "in the library" in text
+
+
+def test_prefers_html_follows_accept_order() -> None:
+    assert prefers_html("text/html,application/xhtml+xml")
+    assert not prefers_html("*/*")
+    assert not prefers_html("application/json")
+    assert not prefers_html("application/json, text/html")
+    assert prefers_html("text/html, application/json")

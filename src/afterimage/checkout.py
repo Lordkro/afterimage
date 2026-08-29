@@ -74,7 +74,7 @@ class StripeCheckout:
             success_url=(
                 f"{self._public}/v1/billing/success?session_id={{CHECKOUT_SESSION_ID}}"
             ),
-            cancel_url=f"{self._public}/llms.txt",
+            cancel_url=f"{self._public}/",
             metadata={"key_id": key_id, "pack": pack},
         )
         if not session.url:

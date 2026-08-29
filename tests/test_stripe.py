@@ -167,3 +167,27 @@ def test_success_url_credits_a_paid_stripe_session() -> None:
     again = client.get("/v1/billing/success", params={"session_id": session_id}).json()
     assert again["already"] is True
     assert keys.balance_for_secret(created["api_key"]) == 5_000_000
+
+
+def test_success_url_is_html_when_a_browser_asks() -> None:
+    client, _keys, checkout = _stripe_client()
+    created = client.post("/v1/billing/checkout", json={"pack": "starter"}).json()
+    session_id = "cs_test_html_1"
+    checkout.paid[session_id] = {
+        "id": session_id,
+        "payment_status": "paid",
+        "metadata": {"key_id": created["key_id"], "pack": "starter"},
+    }
+
+    response = client.get(
+        "/v1/billing/success",
+        params={"session_id": session_id},
+        headers={"Accept": "text/html"},
+    )
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/html")
+    assert "Credits landed" in response.text
+    assert "AfterImage" in response.text
+    assert 'href="#"' not in response.text
+    assert "{{" not in response.text

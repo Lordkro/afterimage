@@ -21,10 +21,10 @@ from afterimage.discovery import (
     mcp_server_card,
     x402_well_known,
 )
-from afterimage.landing import ICON_SVG, landing_html
 from afterimage.facilitator import HttpFacilitator
 from afterimage.fetch import HttpxFetcher
 from afterimage.keys import KeyStore, SqliteKeyStore
+from afterimage.landing import ICON_SVG, landing_html, paid_html, prefers_html
 from afterimage.mcp import handle_rpc
 from afterimage.models import Clock, Fetcher, SnapshotStore
 from afterimage.packs import PACKS, get_pack
@@ -37,6 +37,7 @@ from afterimage.pages import (
     snapshot_page,
 )
 from afterimage.pricing import MISS_ATOMIC, SEARCH_ATOMIC, price_atomic
+from afterimage.rate_limit import SlidingWindow
 from afterimage.search import (
     DEFAULT_SEARCH_LIMIT,
     MAX_SEARCH_LIMIT,
@@ -45,7 +46,6 @@ from afterimage.search import (
 )
 from afterimage.settings import Settings, paid_mode
 from afterimage.store import SqliteSnapshotStore
-from afterimage.rate_limit import SlidingWindow
 from afterimage.x402 import (
     MCP_DESCRIPTION,
     PAGE_DESCRIPTION,
@@ -158,8 +158,8 @@ def create_app(
         }
 
     @app.get("/", response_class=HTMLResponse, include_in_schema=False)
-    def home() -> str:
-        return landing_html(app.state.settings)
+    async def home() -> str:
+        return landing_html(app.state.settings, await _stats())
 
     @app.get("/icon.svg", include_in_schema=False)
     def icon() -> Response:
@@ -451,15 +451,19 @@ def create_app(
             return JSONResponse(status_code=401, content={"error": "unknown API key"})
         return JSONResponse({"credits_usd": micros / 1_000_000, "micros": micros})
 
-    async def _fulfill(session_id: str) -> JSONResponse:
+    async def _fulfill_payload(session_id: str) -> tuple[int, dict]:
         if app.state.keys is None or app.state.checkout is None:
-            return JSONResponse(status_code=503, content={"error": "billing off"})
+            return 503, {"error": "billing off"}
         try:
             session = await app.state.checkout.retrieve_session(session_id)
         except Exception:
-            return JSONResponse(status_code=404, content={"error": "unknown session"})
+            return 404, {"error": "unknown session"}
         result = await apply_paid_session(app.state.keys, session)
         status = 200 if result.get("credited") else 402
+        return status, result
+
+    async def _fulfill(session_id: str) -> JSONResponse:
+        status, result = await _fulfill_payload(session_id)
         return JSONResponse(result, status_code=status)
 
     @app.post("/v1/billing/webhook", include_in_schema=False)
@@ -484,11 +488,25 @@ def create_app(
                 return await _fulfill(session_id)
         return JSONResponse({"ok": True})
 
-    @app.get("/v1/billing/success", include_in_schema=False)
-    async def billing_success(session_id: str | None = None) -> JSONResponse:
+    @app.get("/v1/billing/success", include_in_schema=False, response_model=None)
+    async def billing_success(
+        request: Request, session_id: str | None = None
+    ) -> JSONResponse | HTMLResponse:
         if not session_id:
-            return JSONResponse({"error": "session_id required"}, status_code=422)
-        return await _fulfill(session_id)
+            payload = {"error": "session_id required"}
+            if prefers_html(request.headers.get("accept", "")):
+                return HTMLResponse(
+                    paid_html(app.state.settings, payload, status=422),
+                    status_code=422,
+                )
+            return JSONResponse(payload, status_code=422)
+        status, result = await _fulfill_payload(session_id)
+        if prefers_html(request.headers.get("accept", "")):
+            return HTMLResponse(
+                paid_html(app.state.settings, result, status=status),
+                status_code=status,
+            )
+        return JSONResponse(result, status_code=status)
 
     @app.get("/robots.txt", response_class=PlainTextResponse, include_in_schema=False)
     def robots() -> str:
