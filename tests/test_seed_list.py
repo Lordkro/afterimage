@@ -12,6 +12,13 @@ _TRAINING_DATA_MARKERS = (
     "www.rfc-editor.org",
     "httpwg.org",
 )
+_REDIRECT_DUPES = (
+    "https://platform.claude.com/docs/en/models/overview",
+    "https://www.anthropic.com/pricing",
+    "https://docs.x.ai/docs/models",
+    "https://modelcontextprotocol.io/specification/draft",
+    "https://httpx.readthedocs.io/en/latest/",
+)
 
 
 def _seed_urls() -> list[str]:
@@ -28,9 +35,12 @@ def test_seed_list_is_the_moving_class() -> None:
     urls = _seed_urls()
     blob = "\n".join(urls)
     assert len(urls) >= 40
+    assert len(urls) == len(set(urls))
     for url in urls:
         assert url.startswith("https://")
         assert not is_volatile_url(url)
+        assert url.rstrip("/") not in {u.rstrip("/") for u in _REDIRECT_DUPES}
+        assert url not in _REDIRECT_DUPES
         for marker in _TRAINING_DATA_MARKERS:
             assert marker not in url
     assert "docs.x402.org" in blob

@@ -8,12 +8,8 @@ https://platform.openai.com/docs/models
 https://platform.openai.com/docs/pricing
 https://docs.anthropic.com/en/docs/about-claude/models
 https://docs.anthropic.com/en/docs/about-claude/pricing
-https://platform.claude.com/docs/en/models/overview
-https://platform.claude.com/docs/en/about-claude/pricing
-https://www.anthropic.com/pricing
 https://claude.com/pricing
 https://docs.x.ai/
-https://docs.x.ai/docs/models
 https://docs.x.ai/developers/models
 https://ai.google.dev/gemini-api/docs/models
 https://ai.google.dev/gemini-api/docs/pricing
@@ -35,7 +31,6 @@ https://modelcontextprotocol.io/specification/2025-03-26
 https://modelcontextprotocol.io/specification/2025-06-18
 https://modelcontextprotocol.io/specification/2025-11-25
 https://modelcontextprotocol.io/specification/2026-07-28
-https://modelcontextprotocol.io/docs/concepts/architecture
 https://modelcontextprotocol.io/docs/concepts/tools
 https://modelcontextprotocol.io/docs/concepts/resources
 https://modelcontextprotocol.io/docs/concepts/prompts
@@ -44,7 +39,6 @@ https://modelcontextprotocol.io/docs/learn/architecture
 https://modelcontextprotocol.io/docs/develop/build-server
 https://a2a-protocol.org/latest/specification/
 https://a2a-protocol.org/latest/topics/what-is-a2a/
-https://modelcontextprotocol.io/specification/draft
 https://spec.openapis.org/oas/latest.html
 https://llmstxt.org/
 
@@ -122,7 +116,6 @@ https://docs.pydantic.dev/latest/
 https://docs.pydantic.dev/latest/concepts/models/
 https://docs.pydantic.dev/latest/concepts/json_schema/
 https://docs.pydantic.dev/latest/concepts/settings/
-https://httpx.readthedocs.io/en/latest/
 https://httpx.readthedocs.io/en/latest/quickstart.html
 https://docs.pytest.org/en/stable/
 https://docs.pytest.org/en/stable/how-to/fixtures.html
@@ -144,6 +137,5 @@ https://docs.github.com/en/actions
 https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions
 https://docs.github.com/en/rest/repos/repos
 https://docs.github.com/en/rest/issues/issues
-https://platform.claude.com/docs/en/agents-and-tools/tool-use/overview
 https://developers.openai.com/api/docs/guides/function-calling
 https://docs.anthropic.com/en/docs/build-with-claude/tool-use
