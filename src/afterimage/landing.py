@@ -168,7 +168,7 @@ curl -sS '{base}/v1/search?q=fastapi+background+tasks' \\
 curl -sS '{base}/v1/page?url=https://example.com/&amp;max_age_s=900' \\
   -H "Authorization: Bearer ak_live_…"</pre>
     <footer>
-      Caps: 5,000 pages, 32,000 characters per page, evicted after 7 days.
+      Caps: 5,000 pages, 32,000 characters per page, evicted after {settings.snapshot_ttl_days} days.
       Live size: GET {base}/v1/stats (free). Removal: {escape(settings.removal_email)}.
       Agents start at <a href="{base}/llms.txt">{base}/llms.txt</a>.
     </footer>

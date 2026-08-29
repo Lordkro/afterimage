@@ -138,14 +138,14 @@ Response:
 - fetched_at, age_s, status, title, final_url
 - truncated: true if text hit the character cap
 - stored: false if AfterImage did not keep a copy
-- stored_reason: noarchive | no-store | private | vary | http_error | thin_extract
+- stored_reason: noarchive | no-store | private | vary | http_error | thin_extract | volatile
 - origin_max_age_s: remaining origin freshness in seconds (s-maxage/max-age
   minus Age, or Expires; 0 for no-cache). Reuse is min(your max_age_s,
-  origin_max_age_s, 7-day TTL).
+  origin_max_age_s, {settings.snapshot_ttl_days}-day TTL).
 - vary, etag, last_modified: origin validators when present (etag/last-modified
   are stored for later revalidation; they do not change price today)
 
-Reuse of a stored copy is min(your max_age_s, origin_max_age_s, 7-day TTL).
+Reuse of a stored copy is min(your max_age_s, origin_max_age_s, {settings.snapshot_ttl_days}-day TTL).
 If you already have the URL from a search hit, call /v1/page to get the full text.
 If cache=hit, do not fetch the origin yourself unless you need a smaller max_age_s.
 
@@ -178,7 +178,8 @@ no-store / private / Vary: *: the caller still gets the page; AfterImage does
 not store it. Those URLs never become cache hits and always bill at the
 live-fetch rate. Cache-Control: no-cache is stored for search but origin
 freshness is 0, so /v1/page always refetches. Age is subtracted from max-age.
-Copies that are stored are evicted after 7 days or when the 5,000-page cap
+Status pages (status.openai.com and similar) are fetched live and never stored.
+Copies that are stored are evicted after {settings.snapshot_ttl_days} days or when the 5,000-page cap
 drops the oldest. Caps and live size: GET {base}/v1/stats.
 To request removal of a stored URL, email {settings.removal_email}.
 """

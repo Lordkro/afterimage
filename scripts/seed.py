@@ -85,7 +85,7 @@ async def main() -> int:
     ok = 0
     stored = 0
     async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
-        max_age_s = 0 if args.refresh else 604800
+        max_age_s = 0 if args.refresh else 10 * 24 * 60 * 60
         tasks = [
             snapshot(client, args.host, url, sem, args.api_key, max_age_s)
             for url in urls

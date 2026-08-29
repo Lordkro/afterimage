@@ -1,6 +1,10 @@
+import asyncio
+from datetime import UTC, datetime
+
 from fastapi.testclient import TestClient
 
 from afterimage.app import create_app
+from afterimage.models import Snapshot
 from afterimage.settings import Settings
 from tests.fakes import FakeClock, FakeFetcher, FakePage, MemorySnapshotStore
 
@@ -86,6 +90,55 @@ def test_stored_text_is_capped() -> None:
     text = response.json()["text"]
     assert len(text) <= 80
     assert text.startswith("lorem ipsum")
+
+
+def test_status_pages_are_fetched_live_and_not_stored() -> None:
+    url = "https://status.openai.com/"
+    html = (
+        b"<!DOCTYPE html><html><head><title>OpenAI Status</title></head>"
+        b"<body><main><p>All systems operational</p></main></body></html>"
+    )
+    client = _client(
+        {url: FakePage(body=html)},
+        settings=Settings(max_snapshots=100, snapshot_ttl_s=10_000_000),
+    )
+    body = client.get("/v1/page", params={"url": url}).json()
+    assert body["stored"] is False
+    assert body["stored_reason"] == "volatile"
+    assert "All systems operational" in body["text"]
+    search = client.get("/v1/search", params={"q": "operational"}).json()
+    assert search["indexed"] == 0
+    assert search["hits"] == []
+
+
+def test_already_stored_status_pages_are_dropped_from_search() -> None:
+    store = MemorySnapshotStore()
+    now = datetime(2026, 8, 27, 18, 41, 2, tzinfo=UTC)
+    asyncio.run(
+        store.put(
+            Snapshot(
+                url="https://status.anthropic.com/",
+                final_url="https://status.anthropic.com/",
+                status=200,
+                title="Anthropic Status",
+                text="All systems operational",
+                content_hash="sha256:" + "a" * 64,
+                fetched_at=now,
+                content_type="text/html",
+            )
+        )
+    )
+    client = TestClient(
+        create_app(
+            fetcher=FakeFetcher({}),
+            store=store,
+            clock=FakeClock(),
+            settings=Settings(max_snapshots=100, snapshot_ttl_s=10_000_000),
+        )
+    )
+    body = client.get("/v1/search", params={"q": "operational"}).json()
+    assert body["indexed"] == 0
+    assert body["hits"] == []
 
 
 def test_error_pages_are_not_kept_in_the_corpus() -> None:

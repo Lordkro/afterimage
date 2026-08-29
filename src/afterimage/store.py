@@ -6,6 +6,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from afterimage.models import Snapshot
+from afterimage.volatile import is_volatile_url
 
 
 class SqliteSnapshotStore:
@@ -161,6 +162,12 @@ class SqliteSnapshotStore:
 
     async def prune(self, *, now: datetime, ttl_s: int, max_snapshots: int) -> None:
         async with self._lock:
+            volatile = [
+                row[0]
+                for row in self._conn.execute("SELECT url, final_url FROM snapshots")
+                if is_volatile_url(row[0]) or is_volatile_url(row[1])
+            ]
+            self._delete_urls(volatile)
             if ttl_s > 0:
                 cutoff = (now.astimezone(UTC) - timedelta(seconds=ttl_s)).isoformat()
                 urls = [

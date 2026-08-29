@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
 from afterimage.models import FetchResult, Snapshot
+from afterimage.volatile import is_volatile_url
 
 
 @dataclass
@@ -65,6 +66,13 @@ class MemorySnapshotStore:
         return hits
 
     async def prune(self, *, now: datetime, ttl_s: int, max_snapshots: int) -> None:
+        volatile = [
+            url
+            for url, snapshot in self._by_url.items()
+            if is_volatile_url(url) or is_volatile_url(snapshot.final_url)
+        ]
+        for url in volatile:
+            del self._by_url[url]
         if ttl_s > 0:
             expired = [
                 url

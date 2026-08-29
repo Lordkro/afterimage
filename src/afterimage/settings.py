@@ -24,9 +24,13 @@ class Settings(BaseSettings):
     # Cache, not an archive. These caps keep the Railway volume small.
     max_snapshots: int = 5_000
     max_text_chars: int = 32_000
-    snapshot_ttl_s: int = 7 * 24 * 60 * 60
+    snapshot_ttl_s: int = 10 * 24 * 60 * 60
     persist_error_pages: bool = False
     removal_email: str = "removal@afterimage.page"
+
+    @property
+    def snapshot_ttl_days(self) -> int:
+        return max(1, self.snapshot_ttl_s // (24 * 60 * 60))
 
 
 def paid_mode(settings: Settings) -> bool:

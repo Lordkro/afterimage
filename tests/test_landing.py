@@ -26,4 +26,5 @@ def test_root_is_a_human_landing_page() -> None:
     assert 'href="#"' not in text
     assert "AfterImageAfterImage" not in text
     assert "Caps:" in text
+    assert "evicted after 10 days" in text
     assert "About 5,000" not in text

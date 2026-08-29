@@ -5,13 +5,14 @@ from datetime import UTC, datetime
 from pydantic import BaseModel, Field
 
 from afterimage.extract import extract_readable, unusable_extract
-from afterimage.origin_cache import origin_cache_policy
-from afterimage.robots_archive import forbids_archive
 from afterimage.hashing import sha256_bytes
 from afterimage.models import Clock, Fetcher, Snapshot, SnapshotStore
+from afterimage.origin_cache import origin_cache_policy
 from afterimage.pricing import price_usdc
+from afterimage.robots_archive import forbids_archive
 from afterimage.settings import Settings
 from afterimage.urls import require_public_http_url
+from afterimage.volatile import is_volatile_url
 
 DEFAULT_MAX_AGE_S = 900
 
@@ -94,13 +95,15 @@ async def snapshot_page(
         max_age_s = 0
     await prune_corpus(store, settings, clock)
     now = clock.now()
-    existing = await fresh_snapshot(
-        url,
-        max_age_s=max_age_s,
-        store=store,
-        clock=clock,
-        ttl_s=settings.snapshot_ttl_s,
-    )
+    existing = None
+    if not is_volatile_url(url):
+        existing = await fresh_snapshot(
+            url,
+            max_age_s=max_age_s,
+            store=store,
+            clock=clock,
+            ttl_s=settings.snapshot_ttl_s,
+        )
     if existing is not None:
         truncated = _looks_truncated(existing.text, settings.max_text_chars)
         return _view(
@@ -123,7 +126,9 @@ async def snapshot_page(
         content_type=fetched.content_type,
     )
     stored_reason = None
-    if noarchive:
+    if is_volatile_url(url) or is_volatile_url(fetched.final_url):
+        stored_reason = "volatile"
+    elif noarchive:
         stored_reason = "noarchive"
     elif not policy.persist:
         stored_reason = policy.reason

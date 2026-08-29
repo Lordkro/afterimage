@@ -38,7 +38,7 @@ def test_stats_is_free_and_reports_live_corpus_size() -> None:
     assert body["indexed"] == 1
     assert body["max_snapshots"] == 5000
     assert body["max_text_chars"] == 32_000
-    assert body["snapshot_ttl_s"] == 7 * 24 * 60 * 60
+    assert body["snapshot_ttl_s"] == 10 * 24 * 60 * 60
     assert body["oldest_fetched_at"] == "2026-08-27T18:41:02Z"
     assert body["oldest_age_s"] == 0
     assert health.json()["indexed"] == 1
