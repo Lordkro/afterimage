@@ -35,17 +35,22 @@ class SqliteSnapshotStore:
             """
         )
         self._conn.commit()
-        self._ensure_origin_max_age()
+        self._ensure_columns()
         self._backfill_fts()
         self._lock = asyncio.Lock()
 
-    def _ensure_origin_max_age(self) -> None:
+    def _ensure_columns(self) -> None:
         cols = {row[1] for row in self._conn.execute("PRAGMA table_info(snapshots)")}
-        if "origin_max_age_s" not in cols:
-            self._conn.execute(
-                "ALTER TABLE snapshots ADD COLUMN origin_max_age_s INTEGER"
-            )
-            self._conn.commit()
+        wanted = {
+            "origin_max_age_s": "INTEGER",
+            "vary": "TEXT",
+            "etag": "TEXT",
+            "last_modified": "TEXT",
+        }
+        for name, typ in wanted.items():
+            if name not in cols:
+                self._conn.execute(f"ALTER TABLE snapshots ADD COLUMN {name} {typ}")
+        self._conn.commit()
 
     def _backfill_fts(self) -> None:
         count = self._conn.execute("SELECT COUNT(*) FROM snapshots_fts").fetchone()
@@ -64,7 +69,8 @@ class SqliteSnapshotStore:
         async with self._lock:
             row = self._conn.execute(
                 "SELECT url, final_url, status, title, text, content_hash, fetched_at, "
-                "content_type, origin_max_age_s FROM snapshots WHERE url = ?",
+                "content_type, origin_max_age_s, vary, etag, last_modified "
+                "FROM snapshots WHERE url = ?",
                 (url,),
             ).fetchone()
         if row is None:
@@ -77,8 +83,8 @@ class SqliteSnapshotStore:
                 """
                 INSERT INTO snapshots (
                     url, final_url, status, title, text, content_hash, fetched_at,
-                    content_type, origin_max_age_s
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    content_type, origin_max_age_s, vary, etag, last_modified
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(url) DO UPDATE SET
                     final_url = excluded.final_url,
                     status = excluded.status,
@@ -87,7 +93,10 @@ class SqliteSnapshotStore:
                     content_hash = excluded.content_hash,
                     fetched_at = excluded.fetched_at,
                     content_type = excluded.content_type,
-                    origin_max_age_s = excluded.origin_max_age_s
+                    origin_max_age_s = excluded.origin_max_age_s,
+                    vary = excluded.vary,
+                    etag = excluded.etag,
+                    last_modified = excluded.last_modified
                 """,
                 (
                     snapshot.url,
@@ -99,6 +108,9 @@ class SqliteSnapshotStore:
                     snapshot.fetched_at.astimezone(UTC).isoformat(),
                     snapshot.content_type,
                     snapshot.origin_max_age_s,
+                    snapshot.vary,
+                    snapshot.etag,
+                    snapshot.last_modified,
                 ),
             )
             self._conn.execute(
@@ -130,7 +142,8 @@ class SqliteSnapshotStore:
             rows = self._conn.execute(
                 """
                 SELECT s.url, s.final_url, s.status, s.title, s.text, s.content_hash,
-                       s.fetched_at, s.content_type, s.origin_max_age_s
+                       s.fetched_at, s.content_type, s.origin_max_age_s,
+                       s.vary, s.etag, s.last_modified
                 FROM snapshots s
                 WHERE s.url IN (
                     SELECT url FROM snapshots_fts WHERE snapshots_fts MATCH ?
@@ -186,4 +199,7 @@ class SqliteSnapshotStore:
             fetched_at=fetched_at.astimezone(UTC),
             content_type=row[7],
             origin_max_age_s=int(row[8]) if len(row) > 8 and row[8] is not None else None,
+            vary=row[9] if len(row) > 9 else None,
+            etag=row[10] if len(row) > 10 else None,
+            last_modified=row[11] if len(row) > 11 else None,
         )

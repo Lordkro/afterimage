@@ -178,6 +178,34 @@ def test_no_cache_never_becomes_a_hit() -> None:
     assert second["cache"] == "miss"
 
 
+def test_etag_last_modified_and_vary_are_returned() -> None:
+    body = (
+        TestClient(
+            create_app(
+                fetcher=FakeFetcher(
+                    {
+                        "https://example.com/val": FakePage(
+                            body=PRICING_HTML,
+                            headers={
+                                "etag": '"abc123"',
+                                "last-modified": "Sat, 29 Aug 2026 12:00:00 GMT",
+                                "vary": "Accept-Language",
+                            },
+                        )
+                    }
+                ),
+                store=MemorySnapshotStore(),
+            )
+        )
+        .get("/v1/page", params={"url": "https://example.com/val"})
+        .json()
+    )
+    assert body["etag"] == '"abc123"'
+    assert body["last_modified"] == "Sat, 29 Aug 2026 12:00:00 GMT"
+    assert body["vary"] == "Accept-Language"
+    assert body["stored"] is True
+
+
 def test_vary_star_is_returned_with_reason() -> None:
     body = (
         TestClient(

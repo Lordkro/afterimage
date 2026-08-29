@@ -120,6 +120,13 @@ If hits is empty but indexed > 0, nothing matched. Try different words or fetch 
 
 GET {base}/v1/page?url=https://example.com/pricing&max_age_s=900
 
+Live fetches always send this fixed header set (never Cookie, never Authorization):
+  User-Agent: AfterImage/0.1 (+https://github.com/Lordkro/afterimage; agent-snapshot)
+  Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
+  Accept-Language: en-US,en;q=0.9
+The stored copy is that one variant. If the origin sent Vary, it is returned as
+vary. Locale- or UA-specific pages may not match a different client.
+
 Query:
 - url (required): http or https. No logins, no private/internal addresses.
 - max_age_s (optional, default 900): reuse a stored copy if it is no older than this
@@ -135,6 +142,8 @@ Response:
 - origin_max_age_s: remaining origin freshness in seconds (s-maxage/max-age
   minus Age, or Expires; 0 for no-cache). Reuse is min(your max_age_s,
   origin_max_age_s, 7-day TTL).
+- vary, etag, last_modified: origin validators when present (etag/last-modified
+  are stored for later revalidation; they do not change price today)
 
 Reuse of a stored copy is min(your max_age_s, origin_max_age_s, 7-day TTL).
 If you already have the URL from a search hit, call /v1/page to get the full text.

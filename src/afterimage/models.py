@@ -26,6 +26,9 @@ class Snapshot:
     fetched_at: datetime
     content_type: str
     origin_max_age_s: int | None = None
+    vary: str | None = None
+    etag: str | None = None
+    last_modified: str | None = None
 
 
 class Fetcher(Protocol):

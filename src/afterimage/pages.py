@@ -32,6 +32,9 @@ class PageResponse(BaseModel):
     stored: bool = True
     stored_reason: str | None = None
     origin_max_age_s: int | None = None
+    vary: str | None = None
+    etag: str | None = None
+    last_modified: str | None = None
 
 
 def iso_z(dt: datetime) -> str:
@@ -136,6 +139,9 @@ async def snapshot_page(
         fetched_at=now,
         content_type=fetched.content_type,
         origin_max_age_s=policy.max_age_s,
+        vary=_header(fetched.headers, "vary"),
+        etag=_header(fetched.headers, "etag"),
+        last_modified=_header(fetched.headers, "last-modified"),
     )
     keep = stored_reason is None
     if keep:
@@ -189,4 +195,17 @@ def _view(
         stored=stored,
         stored_reason=stored_reason,
         origin_max_age_s=snapshot.origin_max_age_s,
+        vary=snapshot.vary,
+        etag=snapshot.etag,
+        last_modified=snapshot.last_modified,
     )
+
+
+def _header(headers: dict[str, str] | None, name: str) -> str | None:
+    if not headers:
+        return None
+    value = headers.get(name.lower()) or headers.get(name)
+    if value is None:
+        return None
+    stripped = value.strip()
+    return stripped or None

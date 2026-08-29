@@ -54,6 +54,9 @@ def test_page_fetch_returns_readable_snapshot_on_miss() -> None:
     assert body["price_usdc"] == "0.01"
     assert body["truncated"] is False
     assert body["stored"] is True
+    assert "etag" in body
+    assert "last_modified" in body
+    assert "vary" in body
 
 
 def test_fresh_snapshot_is_reused_instead_of_refetching() -> None:

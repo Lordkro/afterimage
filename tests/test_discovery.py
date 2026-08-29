@@ -15,6 +15,8 @@ def test_llms_txt_tells_an_agent_how_to_call_afterimage() -> None:
     text = response.text
     assert "AfterImage" in text
     assert "/v1/page" in text
+    assert "Accept-Language: en-US" in text
+    assert "never Cookie" in text
     assert "max_age_s" in text
     assert "/v1/billing/checkout" in text
     assert "Authorization" in text

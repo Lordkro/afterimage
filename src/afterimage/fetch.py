@@ -15,6 +15,13 @@ MAX_BYTES = 5_000_000
 MAX_REDIRECTS = 5
 TIMEOUT_S = 15.0
 USER_AGENT = "AfterImage/0.1 (+https://github.com/Lordkro/afterimage; agent-snapshot)"
+ACCEPT = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+ACCEPT_LANGUAGE = "en-US,en;q=0.9"
+REQUEST_HEADERS = {
+    "User-Agent": USER_AGENT,
+    "Accept": ACCEPT,
+    "Accept-Language": ACCEPT_LANGUAGE,
+}
 
 Resolver = Callable[..., list]
 
@@ -55,7 +62,7 @@ class HttpxFetcher:
         client = self._client or httpx.AsyncClient(
             follow_redirects=False,
             timeout=TIMEOUT_S,
-            headers={"User-Agent": USER_AGENT},
+            headers=REQUEST_HEADERS,
         )
         try:
             current = url
