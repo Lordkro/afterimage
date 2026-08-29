@@ -29,8 +29,8 @@ https://docs.pydantic.dev/latest/concepts/models/
 https://docs.pydantic.dev/latest/concepts/json_schema/
 https://httpx.readthedocs.io/en/latest/
 https://httpx.readthedocs.io/en/latest/quickstart.html
-https://www.starlette.io/
-https://www.uvicorn.org/
+https://github.com/Kludex/starlette
+https://github.com/Kludex/uvicorn
 
 # Test / lint / package
 https://docs.pytest.org/en/stable/
@@ -98,7 +98,6 @@ https://status.openai.com/
 https://status.anthropic.com/
 https://www.cloudflarestatus.com/
 https://www.githubstatus.com/
-https://openai.com/api/pricing/
 https://www.anthropic.com/pricing
 https://openrouter.ai/docs
 https://docs.anthropic.com/en/docs/about-claude/models
@@ -154,11 +153,11 @@ https://fastapi.tiangolo.com/tutorial/bigger-applications/
 https://fastapi.tiangolo.com/advanced/events/
 https://fastapi.tiangolo.com/advanced/custom-response/
 https://fastapi.tiangolo.com/how-to/conditional-openapi/
-https://www.starlette.io/requests/
-https://www.starlette.io/responses/
-https://www.starlette.io/endpoints/
+https://github.com/Kludex/starlette/blob/main/docs/requests.md
+https://github.com/Kludex/starlette/blob/main/docs/responses.md
+https://github.com/Kludex/starlette/blob/main/docs/endpoints.md
 https://docs.pydantic.dev/latest/concepts/settings/
-https://docs.pydantic.dev/latest/concepts/validation_errors/
+https://docs.pydantic.dev/latest/errors/validation_errors/
 
 # MCP / A2A / x402 that agents look up
 https://modelcontextprotocol.io/specification/2025-06-18
@@ -178,7 +177,7 @@ https://docs.stripe.com/api/checkout/sessions/create
 https://httpwg.org/specs/rfc9111.html
 https://datatracker.ietf.org/doc/html/rfc8288
 https://www.rfc-editor.org/rfc/rfc8615
-https://json-rpc.org/specification
+https://www.jsonrpc.org/specification
 
 # Agent runtime docs
 https://playwright.dev/docs/intro
