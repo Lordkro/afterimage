@@ -6,16 +6,16 @@ from tests.fakes import FakeClock, FakeFetcher, FakePage, MemorySnapshotStore
 from tests.test_page import PRICING_HTML
 
 
-def test_no_store_is_not_persisted() -> None:
+def test_no_store_is_stored_but_never_fresh() -> None:
     policy = origin_cache_policy(headers={"cache-control": "no-store"})
-    assert policy.persist is False
-    assert policy.reason == "no-store"
+    assert policy.persist is True
+    assert policy.max_age_s == 0
 
 
-def test_private_is_not_persisted_in_a_shared_cache() -> None:
+def test_private_is_stored_but_never_fresh() -> None:
     policy = origin_cache_policy(headers={"cache-control": "private, max-age=3600"})
-    assert policy.persist is False
-    assert policy.reason == "private"
+    assert policy.persist is True
+    assert policy.max_age_s == 0
 
 
 def test_s_maxage_wins_for_shared_cache() -> None:
@@ -66,27 +66,29 @@ def test_vary_star_is_not_persisted() -> None:
     assert policy.reason == "vary"
 
 
-def test_no_store_page_is_returned_with_reason() -> None:
-    store = MemorySnapshotStore()
+def test_no_store_is_indexed_but_never_a_cache_hit() -> None:
+    url = "https://example.com/docs"
     client = TestClient(
         create_app(
             fetcher=FakeFetcher(
                 {
-                    "https://example.com/priv": FakePage(
+                    url: FakePage(
                         body=PRICING_HTML,
-                        headers={"cache-control": "no-store"},
+                        headers={"cache-control": "no-store, no-cache, max-age=0"},
                     )
                 }
             ),
-            store=store,
+            store=MemorySnapshotStore(),
         )
     )
-    body = client.get("/v1/page", params={"url": "https://example.com/priv"}).json()
-    assert body["stored"] is False
-    assert body["stored_reason"] == "no-store"
-    assert client.get("/v1/page", params={"url": "https://example.com/priv"}).json()[
-        "cache"
-    ] == "miss"
+    first = client.get("/v1/page", params={"url": url, "max_age_s": 900}).json()
+    assert first["stored"] is True
+    assert first["origin_max_age_s"] == 0
+    search = client.get("/v1/search", params={"q": "Pro is $9"}).json()
+    assert search["indexed"] == 1
+    assert search["hits"][0]["url"] == url
+    second = client.get("/v1/page", params={"url": url, "max_age_s": 900}).json()
+    assert second["cache"] == "miss"
 
 
 def test_origin_max_age_caps_reuse() -> None:

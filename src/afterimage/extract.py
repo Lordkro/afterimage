@@ -143,7 +143,7 @@ def extract_readable(body: bytes, content_type: str = "text/html") -> tuple[str,
     charset = _charset(content_type)
     html = body.decode(charset, errors="replace")
     title, text = _parse(html, skip_chrome=True)
-    if unusable_extract(title, text):
+    if unusable_extract(title, text, body_len=len(body)):
         title2, text2 = _parse(html, skip_chrome=False)
         if len(text2) > len(text):
             title = title or title2
@@ -151,13 +151,15 @@ def extract_readable(body: bytes, content_type: str = "text/html") -> tuple[str,
     return title, text
 
 
-def unusable_extract(title: str, text: str) -> bool:
+def unusable_extract(title: str, text: str, *, body_len: int = 0) -> bool:
     compact = re.sub(r"\s+", " ", text).strip()
     if not compact:
         return True
     if _JS_SHELL.search(compact):
         return True
     if title and compact.lower() == title.lower():
+        return True
+    if body_len >= 40_000 and len(compact) < 120:
         return True
     return False
 

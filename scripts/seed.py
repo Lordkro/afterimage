@@ -93,14 +93,20 @@ async def main() -> int:
     timeout = httpx.Timeout(45.0, connect=10.0)
     ok = 0
     stored = 0
+    stopped = False
     async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
         max_age_s = 0 if args.refresh else 10 * 24 * 60 * 60
         tasks = [
-            snapshot(client, args.host, url, sem, args.api_key, max_age_s)
+            asyncio.create_task(
+                snapshot(client, args.host, url, sem, args.api_key, max_age_s)
+            )
             for url in urls
         ]
         for coro in asyncio.as_completed(tasks):
-            url, cache, status, was_stored, reason, chars = await coro
+            try:
+                url, cache, status, was_stored, reason, chars = await coro
+            except asyncio.CancelledError:
+                continue
             kept = was_stored is True
             if kept:
                 ok += 1
@@ -112,6 +118,15 @@ async def main() -> int:
                 f"{mark:4} {cache:12} {status!s:>4} chars={chars_s:<6} {why:<16} {url}",
                 flush=True,
             )
+            if cache.startswith("http:402") and not stopped:
+                stopped = True
+                print(
+                    "out of credits (HTTP 402); stopping so we do not burn the rest",
+                    file=sys.stderr,
+                    flush=True,
+                )
+                for task in tasks:
+                    task.cancel()
     search = httpx.get(
         f"{args.host.rstrip('/')}/v1/search",
         params={"q": "python"},
@@ -120,6 +135,8 @@ async def main() -> int:
     )
     indexed = search.json().get("indexed") if search.status_code == 200 else "?"
     print(f"done stored_ok={stored}/{len(urls)} indexed={indexed}")
+    if stopped:
+        return 3
     return 0 if stored else 2
 
 

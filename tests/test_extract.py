@@ -125,6 +125,29 @@ def test_much_shorter_extract_does_not_replace_a_good_snapshot() -> None:
     assert "128k" in search["hits"][0]["snippet"]
 
 
+def test_fat_html_with_tiny_extract_is_not_stored() -> None:
+    html = (
+        b"<!DOCTYPE html><html><head><title>Models - Perplexity</title></head>"
+        b"<body><script>" + b"x" * 80_000 + b"</script>"
+        b"<main><h1>Models</h1><p>Explore the Sonar range and compare models</p>"
+        b"</main></body></html>"
+    )
+    body = (
+        TestClient(
+            create_app(
+                fetcher=FakeFetcher(
+                    {"https://docs.perplexity.ai/docs/sonar/models": FakePage(body=html)}
+                ),
+                store=MemorySnapshotStore(),
+            )
+        )
+        .get("/v1/page", params={"url": "https://docs.perplexity.ai/docs/sonar/models"})
+        .json()
+    )
+    assert body["stored"] is False
+    assert body["stored_reason"] == "thin_extract"
+
+
 def test_github_spa_shell_is_not_stored() -> None:
     html = b"""<!DOCTYPE html>
 <html><head><title>Releases</title></head>

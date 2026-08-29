@@ -52,11 +52,6 @@ def origin_cache_policy(
         for part in raw.split(",")
         if part.strip()
     }
-    if "no-store" in tokens:
-        return OriginCache(persist=False, reason="no-store", max_age_s=None)
-    if "private" in tokens:
-        return OriginCache(persist=False, reason="private", max_age_s=None)
-
     lifetime: int | None = None
     if raw:
         s_max = _S_MAXAGE.search(raw)
@@ -72,7 +67,10 @@ def origin_cache_policy(
             start = date if date is not None else (now or datetime.now(UTC))
             lifetime = max(0, int((expires - start).total_seconds()))
 
-    if "no-cache" in tokens:
+    # AfterImage is a snapshot index, not a shared HTTP cache. no-store/private
+    # on public docs (Mintlify/Next defaults) still get indexed; /v1/page will
+    # not reuse them as a cache hit. noarchive and Vary: * remain opt-outs.
+    if "no-store" in tokens or "private" in tokens or "no-cache" in tokens:
         lifetime = 0
     elif lifetime is None and "must-revalidate" in tokens:
         lifetime = 0

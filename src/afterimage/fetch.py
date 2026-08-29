@@ -14,6 +14,12 @@ from afterimage.urls import require_public_http_url
 MAX_BYTES = 5_000_000
 MAX_REDIRECTS = 5
 TIMEOUT_S = 15.0
+
+
+def cap_body(body: bytes) -> tuple[bytes, bool]:
+    if len(body) > MAX_BYTES:
+        return body[:MAX_BYTES], True
+    return body, False
 USER_AGENT = "AfterImage/0.1 (+https://github.com/Lordkro/afterimage; agent-snapshot)"
 ACCEPT = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
 ACCEPT_LANGUAGE = "en-US,en;q=0.9"
@@ -79,9 +85,7 @@ class HttpxFetcher:
                         raise HTTPException(status_code=502, detail="redirect without location")
                     current = urljoin(current, location)
                     continue
-                body = response.content[: MAX_BYTES + 1]
-                if len(body) > MAX_BYTES:
-                    raise HTTPException(status_code=413, detail="response too large")
+                body, _ = cap_body(response.content)
                 return FetchResult(
                     url=url,
                     final_url=str(response.url),

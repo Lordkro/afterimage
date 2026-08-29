@@ -138,9 +138,9 @@ Response:
 - fetched_at, age_s, status, title, final_url
 - truncated: true if text hit the character cap
 - stored: false if AfterImage did not keep a copy
-- stored_reason: noarchive | no-store | private | vary | http_error | thin_extract | volatile | challenge
+- stored_reason: noarchive | vary | http_error | thin_extract | volatile | challenge
 - origin_max_age_s: remaining origin freshness in seconds (s-maxage/max-age
-  minus Age, or Expires; 0 for no-cache). Reuse is min(your max_age_s,
+  minus Age, or Expires; 0 for no-cache / no-store / private). Reuse is min(your max_age_s,
   origin_max_age_s, {settings.snapshot_ttl_days}-day TTL).
 - vary, etag, last_modified: origin validators when present (etag/last-modified
   are stored for later revalidation; they do not change price today)
@@ -173,19 +173,22 @@ Also: GET {base}/mcp/server-card
 AfterImage caches public http(s) pages for agents. It rejects private/internal
 addresses and does not follow logins. It does not currently honor origin
 robots.txt crawl rules.
-Live fetch honors noarchive (meta robots and X-Robots-Tag) and Cache-Control
-no-store / private / Vary: *: the caller still gets the page; AfterImage does
-not store it. Those URLs never become cache hits and always bill at the
-live-fetch rate. Cache-Control: no-cache is stored for search but origin
-freshness is 0, so /v1/page always refetches. Age is subtracted from max-age.
+Live fetch honors noarchive (meta robots and X-Robots-Tag) and Vary: *:
+the caller still gets the page; AfterImage does not store it.
+Cache-Control no-store / private / no-cache is stored for search (AfterImage
+is a snapshot index, not a shared HTTP cache) but origin freshness is 0, so
+/v1/page always refetches those URLs and bills at the live-fetch rate.
+Age is subtracted from max-age.
 stored_reason is why a live fetch was not kept:
-- noarchive / no-store / private / vary: the origin asked not to cache
+- noarchive / vary: the origin asked not to archive, or Vary: *
 - volatile: AfterImage will not index status pages (stale "up" is worse than a miss)
 - challenge: bot interstitial (Cloudflare and similar)
-- thin_extract / http_error: extract was a JS shell, title-only, an order of
-  magnitude shorter than the copy already stored, or an HTTP error
-Origin-forbids and volatile delete any stored copy. challenge and thin_extract
-leave the previous copy in place so a wall does not replace a working snapshot.
+- thin_extract / http_error: extract was a JS shell, title-only, fat HTML with
+  almost no body, an order of magnitude shorter than the copy already stored,
+  or an HTTP error
+noarchive, Vary: *, and volatile delete any stored copy. challenge and
+thin_extract leave the previous copy in place so a wall does not replace a
+working snapshot.
 Copies that are stored are evicted after {settings.snapshot_ttl_days} days or when the 5,000-page cap
 drops the oldest. Caps and live size: GET {base}/v1/stats.
 To request removal of a stored URL, email {settings.removal_email}.

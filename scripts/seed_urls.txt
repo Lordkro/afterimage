@@ -6,8 +6,6 @@
 # Model catalogs and prices
 https://platform.openai.com/docs/models
 https://platform.openai.com/docs/pricing
-https://developers.openai.com/api/docs/models
-https://developers.openai.com/api/docs/pricing
 https://docs.anthropic.com/en/docs/about-claude/models
 https://docs.anthropic.com/en/docs/about-claude/pricing
 https://platform.claude.com/docs/en/models/overview
@@ -28,7 +26,6 @@ https://api-docs.deepseek.com/quick_start/models
 https://api-docs.deepseek.com/quick_start/pricing
 https://docs.cohere.com/docs/models
 https://docs.together.ai/docs/serverless/models
-https://docs.perplexity.ai/docs/sonar/models
 https://docs.fireworks.ai/getting-started/models
 
 # Dated protocol specs (models confuse which revision is current)

@@ -10,6 +10,7 @@ from afterimage.extract import (
     unusable_extract,
     worse_extract,
 )
+from afterimage.fetch import cap_body
 from afterimage.hashing import sha256_bytes
 from afterimage.models import Clock, Fetcher, Snapshot, SnapshotStore
 from afterimage.origin_cache import origin_cache_policy
@@ -122,13 +123,14 @@ async def snapshot_page(
             )
 
     fetched = await fetcher.fetch(url)
-    title, raw_text = extract_readable(fetched.body, fetched.content_type)
+    raw_body, body_truncated = cap_body(fetched.body)
+    title, raw_text = extract_readable(raw_body, fetched.content_type)
     text = truncate_text(raw_text, settings.max_text_chars)
-    truncated = len(raw_text) > len(text)
+    truncated = body_truncated or len(raw_text) > len(text)
     policy = origin_cache_policy(headers=fetched.headers, now=now)
     noarchive = forbids_archive(
         headers=fetched.headers,
-        body=fetched.body,
+        body=raw_body,
         content_type=fetched.content_type,
     )
     stored_reason = None
@@ -140,9 +142,9 @@ async def snapshot_page(
         stored_reason = policy.reason
     elif snapshot_status_blocks_store(fetched.status, settings.persist_error_pages):
         stored_reason = "http_error"
-    elif is_challenge_page(title, text, fetched.body):
+    elif is_challenge_page(title, text, raw_body):
         stored_reason = "challenge"
-    elif unusable_extract(title, text):
+    elif unusable_extract(title, text, body_len=len(raw_body)):
         stored_reason = "thin_extract"
     elif previous is not None and worse_extract(previous.text, text):
         stored_reason = "thin_extract"
@@ -152,7 +154,7 @@ async def snapshot_page(
         status=fetched.status,
         title=title,
         text=text,
-        content_hash=sha256_bytes(fetched.body),
+        content_hash=sha256_bytes(raw_body),
         fetched_at=now,
         content_type=fetched.content_type,
         origin_max_age_s=policy.max_age_s,
@@ -164,7 +166,7 @@ async def snapshot_page(
     if keep:
         await store.put(snapshot)
         await prune_corpus(store, settings, clock)
-    elif stored_reason in {"noarchive", "no-store", "private", "vary", "volatile"}:
+    elif stored_reason in {"noarchive", "vary", "volatile"}:
         await store.delete(url)
     return _view(
         snapshot,

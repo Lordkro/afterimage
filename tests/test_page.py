@@ -31,6 +31,32 @@ def _client(fetcher: FakeFetcher | None = None, clock: FakeClock | None = None) 
     )
 
 
+def test_oversize_body_is_stored_truncated(monkeypatch) -> None:
+    import afterimage.fetch as fetchmod
+
+    monkeypatch.setattr(fetchmod, "MAX_BYTES", 80)
+    url = "https://pypi.org/pypi/ruff/json"
+    payload = (
+        b'{"info":{"name":"ruff","version":"0.9.0"},"files":"' + b"n" * 500 + b'"}'
+    )
+    body = (
+        TestClient(
+            create_app(
+                fetcher=FakeFetcher(
+                    {url: FakePage(body=payload, content_type="application/json")}
+                ),
+                store=MemorySnapshotStore(),
+            )
+        )
+        .get("/v1/page", params={"url": url})
+        .json()
+    )
+    assert body["status"] == 200
+    assert body["stored"] is True
+    assert body["truncated"] is True
+    assert "ruff" in body["text"]
+
+
 def test_page_fetch_returns_readable_snapshot_on_miss() -> None:
     client = _client()
 
