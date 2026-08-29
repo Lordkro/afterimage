@@ -36,7 +36,7 @@ from afterimage.pages import (
     prune_corpus,
     snapshot_page,
 )
-from afterimage.pricing import SEARCH_ATOMIC, price_atomic
+from afterimage.pricing import MISS_ATOMIC, SEARCH_ATOMIC, price_atomic
 from afterimage.search import (
     DEFAULT_SEARCH_LIMIT,
     MAX_SEARCH_LIMIT,
@@ -350,6 +350,7 @@ def create_app(
     async def mcp_endpoint(request: Request, message: dict) -> dict | Response:
         if app.state.fetcher is None or app.state.store is None:
             raise RuntimeError("AfterImage is not configured with a fetcher and store")
+        payment = None
         if message.get("method") == "tools/call":
             params = message.get("params") or {}
             name = params.get("name")
@@ -358,6 +359,7 @@ def create_app(
             if name == "search_pages":
                 amount = SEARCH_ATOMIC
             elif name == "get_page":
+                amount = MISS_ATOMIC
                 page_url = arguments.get("url")
                 if page_url:
                     try:
@@ -371,7 +373,7 @@ def create_app(
                         )
                         amount = price_atomic(cache_hit=cached is not None)
                     except Exception:
-                        amount = None
+                        amount = MISS_ATOMIC
             if amount is not None:
                 payment = await require_payment(
                     request,
@@ -394,6 +396,10 @@ def create_app(
         )
         if reply is None:
             return Response(status_code=204)
+        if payment is not None:
+            response = JSONResponse(reply)
+            response.headers.update(billed_headers(payment))
+            return response
         return reply
 
     @app.post("/v1/billing/checkout")

@@ -156,6 +156,29 @@ def test_paid_mode_challenges_search_at_search_price() -> None:
     assert required["extensions"]["bazaar"]["info"]["input"]["queryParams"]["q"]
 
 
+def test_settled_mcp_tools_call_sends_payment_response() -> None:
+    client = _paid_client()
+    payload = {
+        "x402Version": 2,
+        "accepted": {"scheme": "exact", "amount": SEARCH_ATOMIC},
+        "payload": {"test": True},
+    }
+    token = base64.urlsafe_b64encode(json.dumps(payload).encode()).decode()
+    response = client.post(
+        "/mcp",
+        headers={"PAYMENT-SIGNATURE": token},
+        json={
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/call",
+            "params": {"name": "search_pages", "arguments": {"q": "pricing"}},
+        },
+    )
+    assert response.status_code == 200
+    assert response.headers.get("payment-response")
+    assert response.json()["result"]
+
+
 def test_facilitator_error_includes_response_body() -> None:
     response = httpx.Response(
         500,
