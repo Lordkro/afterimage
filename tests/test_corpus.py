@@ -190,6 +190,41 @@ def test_already_stored_stdlib_is_dropped_from_search() -> None:
     assert body["hits"] == []
 
 
+def test_httpwg_rfc_pages_are_dropped_from_search() -> None:
+    store = MemorySnapshotStore()
+    now = datetime(2026, 8, 27, 18, 41, 2, tzinfo=UTC)
+    for path, title in (
+        ("rfc9110.html", "HTTP Semantics"),
+        ("rfc9111.html", "HTTP Caching"),
+    ):
+        url = f"https://httpwg.org/specs/{path}"
+        asyncio.run(
+            store.put(
+                Snapshot(
+                    url=url,
+                    final_url=url,
+                    status=200,
+                    title=title,
+                    text=f"{title} is RFC text about HTTP.",
+                    content_hash="sha256:" + path.encode().hex()[:64].ljust(64, "0"),
+                    fetched_at=now,
+                    content_type="text/html",
+                )
+            )
+        )
+    client = TestClient(
+        create_app(
+            fetcher=FakeFetcher({}),
+            store=store,
+            clock=FakeClock(),
+            settings=Settings(max_snapshots=100, snapshot_ttl_s=10_000_000),
+        )
+    )
+    body = client.get("/v1/search", params={"q": "RFC HTTP"}).json()
+    assert body["indexed"] == 0
+    assert body["hits"] == []
+
+
 def test_nodejs_docs_are_not_kept_in_the_corpus() -> None:
     url = "https://nodejs.org/docs/latest/api/fs.html"
     html = (
