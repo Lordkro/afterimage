@@ -139,7 +139,7 @@ Response:
 - fetched_at, age_s, status, title, final_url
 - truncated: true if text hit the character cap
 - stored: false if AfterImage did not keep a copy
-- stored_reason: noarchive | vary | http_error | thin_extract | volatile | challenge | training_data
+- stored_reason: noarchive | vary | http_error | thin_extract | volatile | challenge | training_data | example | alias
 - origin_max_age_s: remaining origin freshness in seconds (s-maxage/max-age
   minus Age, or Expires; 0 for no-cache / no-store / private). Reuse is min(your max_age_s,
   origin_max_age_s, {settings.snapshot_ttl_days}-day TTL).
@@ -185,6 +185,8 @@ stored_reason is why a live fetch was not kept:
 - volatile: AfterImage will not index status pages (stale "up" is worse than a miss)
 - training_data: stdlib, PEPs, MDN, RFCs, git-scm, Node, TypeScript, OWASP,
   sqlite, redis, JSON Schema — fetchable, not sold
+- example: IANA example.com at the site root (ping/docs fixtures)
+- alias: same bytes as a URL still on the seed list; the seed URL is kept
 - challenge: bot interstitial (Cloudflare and similar)
 - thin_extract / http_error: extract was a JS shell, title-only, fat HTML with
   almost no body, an order of magnitude shorter than the copy already stored,

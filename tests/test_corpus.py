@@ -243,6 +243,52 @@ def test_nodejs_docs_are_not_kept_in_the_corpus() -> None:
     assert search["hits"] == []
 
 
+def test_stale_seed_alias_is_dropped_from_the_corpus() -> None:
+    seed_url = "https://docs.anthropic.com/en/docs/about-claude/models"
+    alias = "https://platform.claude.com/docs/en/models/overview"
+    html = (
+        b"<!DOCTYPE html><html><head><title>Models</title></head>"
+        b"<body><main><p>Claude Opus is a frontier model with a large context window.</p>"
+        b"</main></body></html>"
+    )
+    pages = {seed_url: FakePage(body=html), alias: FakePage(body=html)}
+    store = MemorySnapshotStore()
+    client = TestClient(
+        create_app(
+            fetcher=FakeFetcher(pages),
+            store=store,
+            clock=FakeClock(),
+            settings=Settings(max_snapshots=100, snapshot_ttl_s=10_000_000),
+        )
+    )
+    assert client.get("/v1/page", params={"url": seed_url}).json()["stored"] is True
+    alias_body = client.get("/v1/page", params={"url": alias}).json()
+    assert alias_body["stored"] is False
+    assert alias_body["stored_reason"] == "alias"
+    body = client.get("/v1/search", params={"q": "Opus"}).json()
+    assert body["indexed"] == 1
+    assert body["hits"][0]["url"] == seed_url
+    assert body["hits"][0]["aliases"] == []
+
+
+def test_example_dot_com_root_is_not_kept_in_the_corpus() -> None:
+    url = "https://example.com/"
+    html = (
+        b"<!DOCTYPE html><html><head><title>Example Domain</title></head>"
+        b"<body><main><p>This domain is for use in documentation examples.</p>"
+        b"</main></body></html>"
+    )
+    client = _client(
+        {url: FakePage(body=html)},
+        settings=Settings(max_snapshots=100, snapshot_ttl_s=10_000_000),
+    )
+    body = client.get("/v1/page", params={"url": url}).json()
+    assert body["stored"] is False
+    assert body["stored_reason"] == "example"
+    search = client.get("/v1/search", params={"q": "documentation examples"}).json()
+    assert search["indexed"] == 0
+
+
 def test_error_pages_are_not_kept_in_the_corpus() -> None:
     url = "https://example.com/gone"
     client = _client(

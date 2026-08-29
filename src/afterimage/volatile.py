@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from urllib.parse import urlparse
 
 # Stale "all systems operational" is worse than a miss. Fetch live, never index.
@@ -49,6 +50,9 @@ def is_volatile_url(url: str) -> bool:
     return _host(url) in _VOLATILE_HOSTS
 
 
+_EXAMPLE_HOSTS = frozenset({"example.com", "example.org", "example.net"})
+
+
 def is_training_data_url(url: str) -> bool:
     host = _host(url)
     if host in _TRAINING_HOSTS:
@@ -56,9 +60,41 @@ def is_training_data_url(url: str) -> bool:
     return host.endswith(".owasp.org")
 
 
+def is_example_fixture_url(url: str) -> bool:
+    """IANA example hosts at the site root — ping/docs artifacts, not corpus."""
+    if _host(url) not in _EXAMPLE_HOSTS:
+        return False
+    path = (urlparse(url).path or "/").rstrip("/") or "/"
+    return path in {"/", "/index.html"}
+
+
+def load_seed_urls() -> frozenset[str]:
+    candidates = [
+        Path(__file__).with_name("seed_urls.txt"),
+        Path(__file__).resolve().parents[2] / "scripts" / "seed_urls.txt",
+        Path("/app/scripts/seed_urls.txt"),
+        Path.cwd() / "scripts" / "seed_urls.txt",
+    ]
+    for path in candidates:
+        try:
+            raw = path.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        urls = {
+            line.strip()
+            for line in raw.splitlines()
+            if line.strip() and not line.strip().startswith("#")
+        }
+        if urls:
+            return frozenset(urls)
+    return frozenset()
+
+
 def drop_reason(url: str) -> str | None:
     if is_volatile_url(url):
         return "volatile"
     if is_training_data_url(url):
         return "training_data"
+    if is_example_fixture_url(url):
+        return "example"
     return None

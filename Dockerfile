@@ -3,6 +3,7 @@ FROM python:3.12-slim
 WORKDIR /app
 COPY pyproject.toml README.md ./
 COPY src ./src
+COPY scripts/seed_urls.txt ./scripts/seed_urls.txt
 RUN pip install --no-cache-dir .
 
 ENV AFTERIMAGE_HOST=0.0.0.0

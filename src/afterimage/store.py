@@ -155,6 +155,15 @@ class SqliteSnapshotStore:
             row = self._conn.execute("SELECT COUNT(*) FROM snapshots").fetchone()
         return int(row[0]) if row else 0
 
+    async def list_all(self) -> list[Snapshot]:
+        async with self._lock:
+            rows = self._conn.execute(
+                "SELECT url, final_url, status, title, text, content_hash, fetched_at, "
+                "content_type, origin_max_age_s, vary, etag, last_modified "
+                "FROM snapshots"
+            ).fetchall()
+        return [self._row_to_snapshot(row) for row in rows]
+
     async def oldest_fetched_at(self) -> datetime | None:
         async with self._lock:
             row = self._conn.execute("SELECT MIN(fetched_at) FROM snapshots").fetchone()

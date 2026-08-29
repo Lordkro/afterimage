@@ -18,7 +18,7 @@ from afterimage.pricing import price_usdc
 from afterimage.robots_archive import forbids_archive
 from afterimage.settings import Settings
 from afterimage.urls import require_public_http_url
-from afterimage.volatile import drop_reason
+from afterimage.volatile import drop_reason, load_seed_urls
 
 DEFAULT_MAX_AGE_S = 900
 
@@ -62,6 +62,32 @@ async def prune_corpus(store: SnapshotStore, settings: Settings, clock: Clock) -
         ttl_s=settings.snapshot_ttl_s,
         max_snapshots=settings.max_snapshots,
     )
+    await drop_stale_seed_aliases(store)
+
+
+async def drop_stale_seed_aliases(store: SnapshotStore) -> None:
+    seed = load_seed_urls()
+    if not seed:
+        return
+    rows = await store.list_all()
+    seed_hashes = {item.content_hash for item in rows if item.url in seed}
+    if not seed_hashes:
+        return
+    for item in rows:
+        if item.url in seed:
+            continue
+        if item.content_hash in seed_hashes:
+            await store.delete(item.url)
+
+
+async def is_stale_seed_alias(store: SnapshotStore, snapshot: Snapshot) -> bool:
+    seed = load_seed_urls()
+    if not seed or snapshot.url in seed:
+        return False
+    for item in await store.list_all():
+        if item.url in seed and item.content_hash == snapshot.content_hash:
+            return True
+    return False
 
 
 async def fresh_snapshot(
@@ -163,10 +189,19 @@ async def snapshot_page(
         last_modified=_header(fetched.headers, "last-modified"),
     )
     keep = stored_reason is None
+    if keep and await is_stale_seed_alias(store, snapshot):
+        stored_reason = "alias"
+        keep = False
     if keep:
         await store.put(snapshot)
         await prune_corpus(store, settings, clock)
-    elif stored_reason in {"noarchive", "vary", "volatile", "training_data"}:
+    elif stored_reason in {
+        "noarchive",
+        "vary",
+        "volatile",
+        "training_data",
+        "example",
+    }:
         await store.delete(url)
     return _view(
         snapshot,

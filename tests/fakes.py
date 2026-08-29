@@ -52,6 +52,9 @@ class MemorySnapshotStore:
     async def count(self) -> int:
         return len(self._by_url)
 
+    async def list_all(self) -> list[Snapshot]:
+        return list(self._by_url.values())
+
     async def oldest_fetched_at(self) -> datetime | None:
         if not self._by_url:
             return None
