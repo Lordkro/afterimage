@@ -1,9 +1,31 @@
+import logging
+import re
+
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Base mainnet USDC. extra.name must match the EIP-712 domain, not the ticker.
 BASE_USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
 USDC_EIP712_NAME = "USD Coin"
 USDC_EIP712_VERSION = "2"
+EVM_ADDRESS_RE = re.compile(r"^0x[0-9a-fA-F]{40}$")
+
+_log = logging.getLogger("afterimage")
+
+
+def evm_pay_to(value: str) -> str:
+    """Return a 0x + 40-hex address, or empty. API keys and other garbage are dropped."""
+    raw = (value or "").strip()
+    if not raw:
+        return ""
+    if EVM_ADDRESS_RE.fullmatch(raw):
+        return raw
+    _log.error(
+        "AFTERIMAGE_PAY_TO is not a Base address (got %s…, %d chars); x402 disabled",
+        raw[:6],
+        len(raw),
+    )
+    return ""
 
 
 class Settings(BaseSettings):
@@ -27,6 +49,11 @@ class Settings(BaseSettings):
     snapshot_ttl_s: int = 10 * 24 * 60 * 60
     persist_error_pages: bool = False
     removal_email: str = "removal@afterimage.page"
+
+    @field_validator("pay_to", mode="before")
+    @classmethod
+    def pay_to_must_be_evm_address(cls, value: object) -> str:
+        return evm_pay_to("" if value is None else str(value))
 
     @property
     def snapshot_ttl_days(self) -> int:

@@ -1,3 +1,5 @@
+import json
+
 from fastapi.testclient import TestClient
 
 from afterimage.app import create_app
@@ -102,6 +104,22 @@ def test_agent_card_is_a2a_discoverable() -> None:
     assert "search_pages" in skill_ids
     assert card.get("securitySchemes") or card.get("security")
     assert "paid" in str(card).lower() or "api key" in str(card).lower() or "402" in str(card)
+
+
+def test_x402_well_known_drops_an_api_key_pay_to() -> None:
+    client = TestClient(
+        create_app(
+            settings=Settings(
+                pay_to="ak_live_this_is_not_an_evm_address_at_all",
+                public_url="https://afterimage.page",
+            )
+        )
+    )
+    body = client.get("/.well-known/x402").json()
+    blob = json.dumps(body)
+    assert "ak_live_" not in blob
+    for resource in body["resources"]:
+        assert resource["accepts"] == []
 
 
 def test_x402_well_known_advertises_one_amount_per_resource() -> None:

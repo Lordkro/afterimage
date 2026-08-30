@@ -7,12 +7,23 @@ import httpx
 
 from afterimage.app import create_app
 from afterimage.facilitator import facilitator_error
+from afterimage.keys import MemoryKeyStore
 from afterimage.pricing import HIT_ATOMIC, MISS_ATOMIC, SEARCH_ATOMIC
-from afterimage.settings import Settings
+from afterimage.settings import Settings, evm_pay_to, paid_mode
 from tests.fakes import FakeClock, FakeFetcher, FakePage, MemorySnapshotStore
 from tests.test_page import PRICING_HTML
 
 PAY_TO = "0x1111111111111111111111111111111111111111"
+
+
+def test_evm_pay_to_keeps_addresses_and_drops_keys() -> None:
+    assert evm_pay_to(PAY_TO) == PAY_TO
+    assert evm_pay_to("  " + PAY_TO + "  ") == PAY_TO
+    assert evm_pay_to("ak_live_this_is_not_an_evm_address_at_all") == ""
+    assert evm_pay_to("0xgg") == ""
+    settings = Settings(pay_to="ak_live_not_an_address", stripe_secret_key="sk_test")
+    assert settings.pay_to == ""
+    assert paid_mode(settings) is True
 
 
 class AcceptingFacilitator:
@@ -177,6 +188,32 @@ def test_settled_mcp_tools_call_sends_payment_response() -> None:
     assert response.status_code == 200
     assert response.headers.get("payment-response")
     assert response.json()["result"]
+
+
+def test_api_key_pay_to_is_not_advertised_on_402() -> None:
+    client = TestClient(
+        create_app(
+            fetcher=FakeFetcher(
+                {"https://example.com/pricing": FakePage(body=PRICING_HTML)}
+            ),
+            store=MemorySnapshotStore(),
+            clock=FakeClock(),
+            settings=Settings(
+                pay_to="ak_live_this_is_not_an_evm_address_at_all",
+                stripe_secret_key="sk_test_fake",
+                public_url="https://afterimage.example",
+            ),
+            keys=MemoryKeyStore(),
+            checkout=object(),
+        )
+    )
+    response = client.get("/v1/page", params={"url": "https://example.com/pricing"})
+    assert response.status_code == 402
+    body = response.json()
+    assert body["code"] == "missing_key"
+    assert "accepts" not in body
+    assert "ak_live_this_is_not" not in json.dumps(body)
+    assert not response.headers.get("payment-required")
 
 
 def test_facilitator_error_includes_response_body() -> None:
